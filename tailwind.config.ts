@@ -11,9 +11,12 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
+        body: ['Roboto', 'Inter', 'sans-serif'],
+        headline: ['Roboto', 'Inter', 'sans-serif'],
         code: ['monospace'],
+      },
+      fontSize: {
+        'xxs': '0.65rem',
       },
       colors: {
         background: 'hsl(var(--background))',
@@ -27,12 +30,19 @@ export default {
           foreground: 'hsl(var(--popover-foreground))',
         },
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+          DEFAULT: '#FF6600',
+          dark: '#E65C00',
+          foreground: '#FFFFFF',
         },
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
+          DEFAULT: '#00B050',
+          dark: '#008F41',
+          foreground: '#FFFFFF',
+        },
+        neutral: {
+          DEFAULT: '#808080',
+          dark: '#666666',
+          foreground: '#FFFFFF',
         },
         muted: {
           DEFAULT: 'hsl(var(--muted))',

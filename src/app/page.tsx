@@ -1,140 +1,197 @@
 
 "use client";
 
-import { useState } from "react";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { SidebarNav } from "@/components/dashboard/SidebarNav";
-import { Header } from "@/components/dashboard/Header";
-import { ProcessMetricsTable } from "@/components/dashboard/ProcessMetricsTable";
-import { OrderIntakeAI } from "@/components/dashboard/OrderIntakeAI";
-import { DeliveryAssistant } from "@/components/dashboard/DeliveryAssistant";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, Box, ClipboardList, TrendingUp } from "lucide-react";
+import { Brain } from "lucide-react";
 
-export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState("dashboard");
-
+export default function OrderFulfillmentDashboard() {
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
-        <SidebarNav activeTab={activeTab} onTabChange={setActiveTab} />
-        <SidebarInset>
-          <Header />
-          <main className="flex-1 p-6 md:p-8 space-y-8 max-w-[1600px] mx-auto w-full">
-            {activeTab === "dashboard" && (
-              <div className="space-y-8 animate-in fade-in duration-700">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div>
-                    <h1 className="text-3xl font-bold tracking-tight">FluxoPedidos Vision</h1>
-                    <p className="text-muted-foreground">Métricas de fulfillment em tempo real e controle de execução.</p>
-                  </div>
-                </div>
+    <div className="min-h-screen p-4 bg-background overflow-x-auto">
+      <div className="max-w-[1400px] mx-auto bg-card shadow-xl rounded-lg overflow-hidden border border-border">
+        {/* Header Principal */}
+        <header className="bg-primary text-white text-center py-3 font-bold text-xl uppercase tracking-wide border-b border-white dark:border-gray-700">
+          Etapas do Processo de Atendimento de Pedidos
+        </header>
 
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <Card className="hover:shadow-md transition-all border-l-4 border-l-primary">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total de Pedidos Hoje</CardTitle>
-                      <Box className="h-4 w-4 text-primary" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">1.284</div>
-                      <p className="text-xs text-muted-foreground">+12,5% em relação a ontem</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="hover:shadow-md transition-all border-l-4 border-l-accent">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Taxa de Automação</CardTitle>
-                      <Activity className="h-4 w-4 text-accent-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">84,2%</div>
-                      <p className="text-xs text-muted-foreground">+5,4% de melhoria</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="hover:shadow-md transition-all border-l-4 border-l-primary/40">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Tarefas Manuais Pendentes</CardTitle>
-                      <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">156</div>
-                      <p className="text-xs text-muted-foreground">32 prioridades críticas</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="hover:shadow-md transition-all border-l-4 border-l-primary">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Tempo Médio de Ciclo</CardTitle>
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">42m 12s</div>
-                      <p className="text-xs text-muted-foreground">-8m vs última semana</p>
-                    </CardContent>
-                  </Card>
-                </div>
+        {/* Linha das Etapas (Numeração) */}
+        <div className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm">
+          <div className="bg-white dark:bg-card border-r border-b border-border"></div>
+          {[
+            { id: 1, label: "Entrada de Pedidos" },
+            { id: 2, label: "Programação de Pedidos" },
+            { id: 3, label: "Liberação de Pedidos" },
+            { id: 4, label: "Geração de OV" },
+            { id: 5, label: "Tratamento de Rupturas" },
+            { id: 6, label: "Ocorrências de Entrega" },
+          ].map((step) => (
+            <div
+              key={step.id}
+              className="bg-primary text-white p-1 text-center font-semibold text-xs flex items-center justify-center gap-1 border-r border-white dark:border-gray-700 last:border-r-0"
+            >
+              <span className="bg-white/20 rounded-full w-5 h-5 flex items-center justify-center text-[10px]">
+                {step.id}
+              </span>
+              {step.label}
+            </div>
+          ))}
+        </div>
 
-                <div className="grid grid-cols-1 gap-8">
-                  <Tabs defaultValue="overview" className="w-full">
-                    <div className="flex justify-between items-center mb-4">
-                      <TabsList className="bg-secondary/50 p-1">
-                        <TabsTrigger value="overview">Visão do Pipeline</TabsTrigger>
-                        <TabsTrigger value="manual">Detalhamento Manual</TabsTrigger>
-                        <TabsTrigger value="auto">Estatísticas de Automação</TabsTrigger>
-                      </TabsList>
-                    </div>
-                    <TabsContent value="overview">
-                      <ProcessMetricsTable />
-                    </TabsContent>
-                    <TabsContent value="manual">
-                      <div className="h-[400px] flex items-center justify-center border-2 border-dashed rounded-xl text-muted-foreground italic">
-                        Carregando detalhes do processamento manual...
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="auto">
-                      <div className="h-[400px] flex items-center justify-center border-2 border-dashed rounded-xl text-muted-foreground italic">
-                        Carregando métricas de performance do motor de automação...
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </div>
+        {/* Sub-Header (Forma / %) */}
+        <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
+          <div className="bg-white dark:bg-card border-r border-b border-border"></div>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <>
+              <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-gray-400">
+                Forma
               </div>
-            )}
+              <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-white">
+                %
+              </div>
+            </>
+          ))}
+        </div>
 
-            {activeTab === "intake" && (
-              <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-                <div className="space-y-1">
-                  <h2 className="text-3xl font-bold tracking-tight">Entrada de Pedidos IA</h2>
-                  <p className="text-muted-foreground">Extraia e valide documentos de pedido automaticamente.</p>
+        {/* Linha Processos Automatizados */}
+        <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
+          <div className="bg-secondary text-white font-bold flex items-center justify-center text-center p-2 border-r border-b border-white dark:border-gray-700 text-lg">
+            Processos Automatizados
+          </div>
+          
+          {/* Colunas Entrada de Pedidos (Subdivididas) */}
+          <div className="col-span-2 grid grid-cols-2 grid-rows-3">
+            <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white/40">Painel de Liberação SIC</div>
+            <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white/40">79,2%</div>
+            <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white/40">
+              PDF - IA <Brain className="h-3 w-3 ml-1" />
+            </div>
+            <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white/40">5,2%</div>
+            <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white/40 leading-tight">Painel Pré Pedidos Automático</div>
+            <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white/40">0,0%</div>
+          </div>
+
+          {/* Outras colunas automatizadas */}
+          {[
+            { label: "Automático", value: "95,3%" },
+            { label: "Automático", value: "28,5%" },
+            { label: "Automático", value: "35,3%" },
+            { label: "Agente Rupturas", value: "1,9%" },
+            { label: "Agente Atendimento IA", value: "0,0%", icon: true },
+          ].map((item, idx) => (
+            <div key={idx} className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700 last:border-r-0">
+              <span className="text-[10px] mb-1 flex items-center flex-col text-center leading-tight">
+                {item.icon && <Brain className="h-3 w-3 mb-0.5" />}
+                {item.label}
+              </span>
+              <span className="text-2xl font-bold">{item.value}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Linha Processos Manuais */}
+        <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
+          <div className="bg-neutral text-white font-bold flex items-center justify-center text-center p-2 border-r border-b border-white dark:border-gray-700 text-lg">
+            Processos Manuais
+          </div>
+
+          {/* Subdivididos Manuais (Entrada) */}
+          <div className="col-span-2 grid grid-cols-2 grid-rows-4">
+            <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white/40 leading-tight">Painel Pré Pedidos Manual</div>
+            <div className="bg-neutral text-white font-bold flex items-center justify-center text-lg border-r border-b border-white/40">7,9%</div>
+            <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white/40">PDF</div>
+            <div className="bg-neutral text-white font-bold flex items-center justify-center text-lg border-r border-b border-white/40">1,3%</div>
+            <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white/40">Importação Excel</div>
+            <div className="bg-neutral text-white font-bold flex items-center justify-center text-lg border-r border-b border-white/40">5,8%</div>
+            <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white/40">Webservice</div>
+            <div className="bg-neutral text-white font-bold flex items-center justify-center text-lg border-r border-b border-white/40">0,7%</div>
+          </div>
+
+          {/* Outras colunas manuais */}
+          {["4,7%", "71,5%", "64,7%", "98,1%", "100,0%"].map((val, idx) => (
+            <div key={idx} className="col-span-2 bg-neutral text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700 last:border-r-0">
+              <span className="text-[10px] mb-1">Manual</span>
+              <span className="text-2xl font-bold">{val}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Linha Peso da Etapa */}
+        <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
+          <div className="bg-gray-500 text-white font-bold flex items-center justify-end pr-4 text-center p-2 border-r border-b border-white dark:border-gray-700 text-lg">
+            Peso da Etapa
+          </div>
+          {[
+            { n: 425, p: "6,2%" },
+            { n: 122, p: "1,8%" },
+            { n: 632, p: "9,2%" },
+            { n: 285, p: "4,1%" },
+            { n: 3080, p: "44,7%" },
+            { n: 2345, p: "34,0%" },
+          ].map((item, idx) => (
+            <>
+              <div key={`n-${idx}`} className="col-span-1 bg-gray-500 text-white flex items-center justify-center font-bold border-r border-b border-white/40">
+                {item.n}
+              </div>
+              <div key={`p-${idx}`} className="col-span-1 bg-gray-500 text-white flex items-center justify-center font-bold text-lg border-r border-b border-white/40 last:border-r-0">
+                {item.p}
+              </div>
+            </>
+          ))}
+        </div>
+
+        {/* Linha Totais de Automação */}
+        <div className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm font-bold text-xl text-black">
+          <div className="bg-white dark:bg-card border-r border-b border-border"></div>
+          {["84,4%", "95,3%", "28,5%", "35,3%", "1,9%", "0,0%"].map((val, idx) => (
+            <div key={idx} className="bg-[#00FF40] text-center py-2 border-r border-b border-white dark:border-gray-700 last:border-r-0">
+              {val}
+            </div>
+          ))}
+        </div>
+
+        {/* Título Gestores */}
+        <div className="grid grid-cols-[220px_1fr] border-b border-gray-400">
+          <div className="bg-gray-600 text-white text-center py-2 font-bold text-sm flex items-center justify-center">Gestores</div>
+          <div className="bg-gray-600 text-white text-center py-2 font-bold text-lg">Detalhamento do Processo de Atendimento por Gestor/Cliente</div>
+        </div>
+
+        {/* Header Totais Gestores */}
+        <div className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm bg-gray-600 text-white font-bold text-xs">
+          <div className="border-r border-b border-gray-500"></div>
+          {["84,4%", "95,3%", "28,5%", "35,3%", "1,9%", "0,0%"].map((val, idx) => (
+            <div key={idx} className="text-center py-1 border-r border-b border-gray-500 last:border-r-0">
+              {val}
+            </div>
+          ))}
+        </div>
+
+        {/* Lista de Gestores */}
+        {[
+          { name: "Ana Paula Alcantara Rauber", values: ["81%", "99%", "15%", "12%", "0%", "0%"], special: { col: 1, type: "amber" } },
+          { name: "Alexandre Postingher Lutke", values: ["100%", "100%", "7%", "42%", "2%", "0%"] },
+          { name: "Fabio Trevisan", values: ["71%", "92%", "48%", "41%", "0%", "0%"] },
+          { name: "Gianne Pizani", values: ["59%", "100%", "12%", "25%", "0%", "0%"] },
+          { name: "Gilmar Heisser de Andrade", values: ["100%", "98%", "69%", "49%", "21%", "0%"] },
+          { name: "Giovane Scherer", values: ["79%", "91%", "34%", "44%", "0%", "0%"] },
+          { name: "Mauricio de Mello Gonçalves", values: ["81%", "97%", "60%", "47%", "0%", "0%"] },
+        ].map((manager, idx) => (
+          <div key={idx} className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm border-b border-border hover:bg-muted/50 transition-colors">
+            <div className="bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 font-medium px-3 py-1 flex items-center text-xs border-r border-white dark:border-gray-700">
+              {manager.name}
+            </div>
+            {manager.values.map((val, vIdx) => {
+              let bgColor = "bg-gray-300 dark:bg-gray-500";
+              if (val === "100%" || val === "99%" || val === "98%" || (manager.special?.col === vIdx && manager.special.type === "amber")) {
+                bgColor = val === "81%" ? "bg-amber-400" : "bg-secondary";
+              }
+              return (
+                <div key={vIdx} className={`${bgColor} text-white text-center py-1 font-bold border-r border-white dark:border-gray-700 flex items-center justify-center relative last:border-r-0`}>
+                  {vIdx === 2 && <div className="w-2 h-2 bg-green-700 transform rotate-45 absolute left-1 top-1"></div>}
+                  {val}
                 </div>
-                <OrderIntakeAI />
-              </div>
-            )}
-
-            {activeTab === "delivery" && (
-              <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-                <div className="space-y-1">
-                  <h2 className="text-3xl font-bold tracking-tight">IA de Ocorrências de Entrega</h2>
-                  <p className="text-muted-foreground">Sugestões inteligentes para exceções logísticas.</p>
-                </div>
-                <DeliveryAssistant />
-              </div>
-            )}
-
-            {["history", "settings", "support"].includes(activeTab) && (
-              <div className="h-[60vh] flex flex-col items-center justify-center text-center space-y-4">
-                 <div className="bg-secondary p-6 rounded-full">
-                    <Box className="h-12 w-12 text-primary animate-pulse" />
-                 </div>
-                 <div>
-                   <h3 className="text-xl font-bold uppercase tracking-widest">Seção de {activeTab === 'history' ? 'Histórico' : activeTab === 'settings' ? 'Configurações' : 'Suporte'}</h3>
-                   <p className="text-muted-foreground max-w-xs mx-auto">Este módulo está em desenvolvimento para completar a visão total do dashboard.</p>
-                 </div>
-              </div>
-            )}
-          </main>
-        </SidebarInset>
+              )
+            })}
+          </div>
+        ))}
       </div>
-    </SidebarProvider>
+    </div>
   );
 }
