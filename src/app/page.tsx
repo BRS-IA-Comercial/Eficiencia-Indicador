@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { 
   LayoutDashboard, 
   Settings as SettingsIcon, 
@@ -13,7 +13,11 @@ import {
   Brain,
   RefreshCw,
   Database,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  ChevronsDown,
+  ChevronsUp
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,11 +30,13 @@ import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import * as XLSX from "xlsx";
+import { cn } from "@/lib/utils";
 
 export default function OrderFulfillmentDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isImporting, setIsImporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const db = useFirestore();
@@ -45,6 +51,23 @@ export default function OrderFulfillmentDashboard() {
   }, [db]);
 
   const { data: erpMappings, loading: isLoadingData } = useCollection(erpMappingsQuery);
+
+  const toggleRow = (id: string) => {
+    setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const expandAll = () => {
+    if (!erpMappings) return;
+    const all = erpMappings.reduce((acc: any, curr: any) => {
+      acc[curr.id] = true;
+      return acc;
+    }, {});
+    setExpandedRows(all);
+  };
+
+  const collapseAll = () => {
+    setExpandedRows({});
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -72,7 +95,6 @@ export default function OrderFulfillmentDashboard() {
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        // Coluna C é índice 2, Coluna E é índice 4
         const conglomerado = row[2];
         const erpMaeRaw = row[4];
 
@@ -218,28 +240,79 @@ export default function OrderFulfillmentDashboard() {
                 </div>
               </div>
 
-              <div className="bg-gray-600 text-white text-center py-1 font-bold text-xs uppercase tracking-tighter">
-                Conglomerados e ERPs Sincronizados em Tempo Real
+              <div className="bg-gray-600 text-white px-4 py-2 flex items-center justify-between border-t border-b border-gray-400">
+                <span className="font-bold text-xs uppercase tracking-tighter">
+                  Conglomerados e ERPs Sincronizados em Tempo Real
+                </span>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-6 text-[9px] bg-white/10 hover:bg-white/20 text-white border-white/20 gap-1"
+                    onClick={expandAll}
+                  >
+                    <ChevronsDown className="h-3 w-3" /> Expandir Tudo
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-6 text-[9px] bg-white/10 hover:bg-white/20 text-white border-white/20 gap-1"
+                    onClick={collapseAll}
+                  >
+                    <ChevronsUp className="h-3 w-3" /> Recolher Tudo
+                  </Button>
+                </div>
               </div>
               
-              <div className="max-h-[300px] overflow-y-auto bg-white dark:bg-surface-dark">
+              <div className="max-h-[400px] overflow-y-auto bg-white dark:bg-surface-dark divide-y divide-gray-200 dark:divide-gray-700">
                 {isLoadingData && (
                   <div className="p-8 text-center text-muted-foreground">
                     <Loader2 className="animate-spin inline mr-2 h-4 w-4" /> Sincronizando com Firestore...
                   </div>
                 )}
-                {erpMappings?.map((mapping: any) => (
-                  <div key={mapping.id} className="grid grid-cols-[220px_1fr] border-b border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <div className="bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 font-bold px-3 py-1 flex items-center text-xxs border-r border-white dark:border-gray-700">
-                      {mapping.conglomerado}
+                {erpMappings?.map((mapping: any) => {
+                  const isExpanded = !!expandedRows[mapping.id];
+                  return (
+                    <div key={mapping.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      {/* Header do Cliente */}
+                      <div 
+                        className="flex items-center justify-between p-3 cursor-pointer group"
+                        onClick={() => toggleRow(mapping.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-1.5 h-6 bg-primary rounded-full" />
+                          <span className="font-bold text-xs text-gray-700 dark:text-gray-200 uppercase tracking-tight">
+                            {mapping.conglomerado}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[9px] text-muted-foreground border-gray-200">
+                            {mapping.erpMaeCodes.length} ERPs
+                          </Badge>
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 text-primary" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Lista de ERPs (Expandível) */}
+                      {isExpanded && (
+                        <div className="px-6 pb-4 pt-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                            {mapping.erpMaeCodes.map((code: string, i: number) => (
+                              <div key={i} className="flex flex-col bg-gray-50 dark:bg-gray-800 border rounded p-2 transition-all hover:border-primary/50">
+                                <span className="text-[10px] text-muted-foreground font-medium uppercase mb-1">Cód. ERP</span>
+                                <span className="text-xs font-bold text-primary">{code}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="px-3 py-1 flex gap-1 items-center flex-wrap">
-                      {mapping.erpMaeCodes.map((code: string, i: number) => (
-                        <Badge key={i} variant="secondary" className="bg-secondary/10 text-secondary border-secondary/20 text-[9px] h-4 py-0">{code}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {!isLoadingData && (!erpMappings || erpMappings.length === 0) && (
                   <div className="p-8 text-center text-muted-foreground italic text-xs">
                     Nenhum mapeamento encontrado no Projeto: {projectId}. Importe um Excel na aba Configuração.
