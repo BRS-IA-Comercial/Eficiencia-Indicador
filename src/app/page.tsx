@@ -10,7 +10,14 @@ import {
   CheckCircle2,
   Loader2,
   FileUp,
-  X
+  X,
+  Brain,
+  Search,
+  Bell,
+  RefreshCw,
+  TrendingUp,
+  Activity,
+  CheckCircle
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,13 +30,14 @@ import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 
 export default function OrderFulfillmentDashboard() {
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [isImporting, setIsImporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const db = useFirestore();
   const { toast } = useToast();
 
-  // Busca real dos dados do Firestore
+  // Busca real dos dados do Firestore para exibição
   const erpMappingsQuery = useMemo(() => {
     if (!db) return null;
     return query(collection(db, "erp_mappings"), orderBy("importedAt", "desc"));
@@ -44,90 +52,86 @@ export default function OrderFulfillmentDashboard() {
     }
   };
 
-  const handleImport = async () => {
+  const handleImport = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Garante que o clique não suba para o seletor de arquivo
     if (!db || !selectedFile) return;
 
     setIsImporting(true);
     
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        
-        // Converter para JSON (matriz de arrays para pegar as colunas C e E)
-        const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        
-        const erpMappingsRef = collection(db, "erp_mappings");
-        let count = 0;
+      const data = await selectedFile.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      
+      // Converter para JSON (matriz de arrays para pegar as colunas C e E)
+      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      
+      const erpMappingsRef = collection(db, "erp_mappings");
+      let count = 0;
 
-        // Pulando cabeçalho (assumindo que a linha 0 é o cabeçalho)
-        for (let i = 1; i < rows.length; i++) {
-          const row = rows[i];
-          const conglomerado = row[2]; // Coluna C (índice 2)
-          const erpMaeRaw = row[4];   // Coluna E (índice 4)
+      // Iterar pelas linhas (pulando o cabeçalho)
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const conglomerado = row[2]; // Coluna C (índice 2)
+        const erpMaeRaw = row[4];   // Coluna E (índice 4)
 
-          if (conglomerado && erpMaeRaw) {
-            const erpCodes = String(erpMaeRaw)
-              .split(",")
-              .map(code => code.trim())
-              .filter(code => code !== "");
-            
-            // Gravação não-bloqueante no Firestore
-            addDoc(erpMappingsRef, {
-              conglomerado: String(conglomerado),
-              erpMaeCodes: erpCodes,
-              importedAt: serverTimestamp()
-            }).catch(err => {
-              console.error("Erro ao salvar documento:", err);
-            });
-            
-            count++;
-          }
+        if (conglomerado && erpMaeRaw) {
+          const erpCodes = String(erpMaeRaw)
+            .split(",")
+            .map(code => code.trim())
+            .filter(code => code !== "");
+          
+          // Gravação no Firestore
+          addDoc(erpMappingsRef, {
+            conglomerado: String(conglomerado),
+            erpMaeCodes: erpCodes,
+            importedAt: serverTimestamp()
+          }).catch(err => {
+            console.error("Erro ao salvar no banco:", err);
+          });
+          
+          count++;
         }
+      }
 
-        toast({
-          title: "Importação iniciada",
-          description: `${count} registros estão sendo processados e salvos no cloud.`,
-        });
-        
-        setSelectedFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        setIsImporting(false);
-      };
-      reader.readAsBinaryString(selectedFile);
+      toast({
+        title: "Sucesso!",
+        description: `${count} registros foram enviados para o banco de dados.`,
+      });
+      
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (error) {
-      console.error("Erro ao ler arquivo:", error);
+      console.error("Erro na importação:", error);
       toast({
         variant: "destructive",
-        title: "Erro na leitura",
+        title: "Erro fatal",
         description: "Não foi possível processar o arquivo Excel.",
       });
+    } finally {
       setIsImporting(false);
     }
   };
 
   return (
-    <div className="min-h-screen p-4 bg-background-light dark:bg-background-dark font-body">
-      <div className="max-w-[1400px] mx-auto space-y-6">
+    <div className="min-h-screen bg-background-light dark:bg-background-dark font-body p-4 overflow-x-auto">
+      <div className="max-w-[1400px] mx-auto space-y-4">
         
-        <Tabs defaultValue="dashboard" className="w-full">
-          <div className="flex justify-between items-center mb-6">
-            <TabsList className="grid w-full grid-cols-2 max-w-[400px] bg-white dark:bg-surface-dark shadow-sm border">
-              <TabsTrigger value="dashboard" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-white">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="flex justify-between items-center mb-4">
+            <TabsList className="bg-white dark:bg-surface-dark shadow-sm border">
+              <TabsTrigger value="dashboard" className="gap-2">
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
               </TabsTrigger>
-              <TabsTrigger value="configuracao" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-white">
+              <TabsTrigger value="configuracao" className="gap-2">
                 <SettingsIcon className="h-4 w-4" />
                 Configuração
               </TabsTrigger>
             </TabsList>
-            
-            <div className="hidden md:flex items-center gap-4 text-sm font-medium text-muted-foreground">
-              <span className="bg-primary/10 text-primary px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider">Vision Fluxo v3.0 - Cloud</span>
+            <div className="text-xxs font-bold text-muted-foreground uppercase tracking-widest bg-white dark:bg-surface-dark px-3 py-1 rounded border">
+              Fluxo Vision v3.1 - Cloud Realtime
             </div>
           </div>
 
@@ -137,6 +141,7 @@ export default function OrderFulfillmentDashboard() {
                 Etapas do Processo de Atendimento de Pedidos
               </header>
 
+              {/* Grid 1: Cabeçalhos das Etapas */}
               <div className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm">
                 <div className="bg-white dark:bg-surface-dark border-r border-b border-gray-200 dark:border-gray-700"></div>
                 {[
@@ -148,164 +153,190 @@ export default function OrderFulfillmentDashboard() {
                   { id: 6, label: "Ocorrências de Entrega" },
                 ].map((step) => (
                   <div key={step.id} className="bg-primary text-white p-1 text-center font-semibold text-xs flex items-center justify-center gap-1 border-r border-white dark:border-gray-700 last:border-r-0">
-                    <span className="bg-white/20 rounded-full w-5 h-5 flex items-center justify-center text-[10px]">{step.id}</span>
+                    <span className="bg-white/20 rounded-full w-4 h-4 flex items-center justify-center text-[10px]">{step.id}</span>
                     {step.label}
                   </div>
                 ))}
               </div>
 
-              <div className="p-8 text-center text-muted-foreground bg-white dark:bg-surface-dark border-b">
-                Grade de Alta Densidade Ativa
-                <div className="mt-2 text-xxs opacity-50 font-mono uppercase tracking-tighter">Firestore Syncing...</div>
+              {/* Grid 2: Forma e % */}
+              <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
+                <div className="bg-white dark:bg-surface-dark border-r border-b border-gray-200 dark:border-gray-700"></div>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <React.Fragment key={i}>
+                    <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-gray-400">Forma</div>
+                    <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-white">%</div>
+                  </React.Fragment>
+                ))}
               </div>
 
-              <div className="bg-gray-600 text-white text-center py-2 font-bold text-sm">
+              {/* Conteúdo Dinâmico (Conglomerados) */}
+              <div className="bg-gray-600 text-white text-center py-1 font-bold text-xs uppercase tracking-tighter">
                 Conglomerados e ERPs Mapeados no Sistema
               </div>
-              <div className="max-h-[400px] overflow-y-auto">
+              
+              <div className="max-h-[300px] overflow-y-auto">
+                {isLoadingData && (
+                  <div className="p-8 text-center text-muted-foreground bg-white dark:bg-surface-dark">
+                    <Loader2 className="animate-spin inline mr-2 h-4 w-4" /> Sincronizando dados reais...
+                  </div>
+                )}
                 {erpMappings?.map((mapping: any) => (
-                  <div key={mapping.id} className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm border-b border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <div className="bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 font-medium px-3 py-2 flex items-center text-xs border-r border-white dark:border-gray-700">
+                  <div key={mapping.id} className="grid grid-cols-[220px_1fr] border-b border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <div className="bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 font-bold px-3 py-1 flex items-center text-xxs border-r border-white dark:border-gray-700">
                       {mapping.conglomerado}
                     </div>
-                    <div className="col-span-6 px-3 py-2 text-xs flex gap-2 items-center flex-wrap">
+                    <div className="px-3 py-1 flex gap-1 items-center flex-wrap bg-white dark:bg-surface-dark">
                       {mapping.erpMaeCodes.map((code: string, i: number) => (
-                        <Badge key={i} variant="secondary" className="bg-secondary/10 text-secondary border-secondary/20 text-[10px] h-5">{code}</Badge>
+                        <Badge key={i} variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[9px] h-4 py-0">{code}</Badge>
                       ))}
                     </div>
                   </div>
                 ))}
-                {isLoadingData && (
-                  <div className="p-12 text-center text-muted-foreground">
-                    <Loader2 className="animate-spin inline mr-2 h-5 w-5" /> 
-                    Sincronizando com o Cloud...
-                  </div>
-                )}
                 {!isLoadingData && (!erpMappings || erpMappings.length === 0) && (
-                  <div className="p-12 text-center text-muted-foreground italic">
-                    Nenhum mapeamento encontrado. Vá em Configuração para importar.
+                  <div className="p-8 text-center text-muted-foreground italic bg-white dark:bg-surface-dark text-xs">
+                    Nenhum mapeamento no banco. Importe um Excel na aba de Configuração.
                   </div>
                 )}
+              </div>
+
+              {/* Tabela de Gestores (Estática conforme modelo) */}
+              <div className="grid grid-cols-[220px_1fr] border-t-2 border-gray-400">
+                <div className="bg-gray-600 text-white text-center py-2 font-bold text-sm">Gestores</div>
+                <div className="bg-gray-600 text-white text-center py-2 font-bold text-sm">Detalhamento por Cliente</div>
+              </div>
+              
+              <div className="bg-gray-100 dark:bg-gray-800">
+                {[
+                  { name: "Ana Paula Alcantara Rauber", values: [81, 99, 15, 12, 0, 0] },
+                  { name: "Alexandre Postingher Lutke", values: [100, 100, 7, 42, 2, 0] },
+                  { name: "Fabio Trevisan", values: [71, 92, 48, 41, 0, 0] }
+                ].map((gestor, idx) => (
+                  <div key={idx} className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm border-b border-gray-300 dark:border-gray-700">
+                    <div className="bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 font-medium px-3 py-1 flex items-center text-xxs border-r border-white dark:border-gray-700">
+                      {gestor.name}
+                    </div>
+                    {gestor.values.map((val, vIdx) => (
+                      <div key={vIdx} className={`text-center py-1 font-bold border-r border-white dark:border-gray-700 flex items-center justify-center text-xs ${val >= 90 ? 'bg-secondary text-white' : val > 0 ? 'bg-amber-400 text-white' : 'bg-gray-300 text-white dark:bg-gray-500'}`}>
+                        {val}%
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="configuracao" className="mt-0">
-            <div className="grid grid-cols-1 gap-6">
-              <Card className="shadow-lg border-primary/20">
-                <CardHeader className="bg-primary text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-xl flex items-center gap-2">
-                        <FileSpreadsheet className="h-6 w-6" />
-                        Importação de Dados de ERP (Real)
-                      </CardTitle>
-                      <CardDescription className="text-white/80">
-                        Selecione seu arquivo Excel para mapear Conglomerados e ERPs.
-                      </CardDescription>
-                    </div>
-                    <Badge variant="outline" className="bg-white/10 text-white border-white/20">
-                      Modelo: Colunas C e E
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-8">
-                  <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/20 rounded-xl p-12 bg-muted/5 relative">
+            <Card className="shadow-lg border-primary/20">
+              <CardHeader className="bg-primary text-white rounded-t-lg">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <FileSpreadsheet className="h-6 w-6" />
+                  Importação de Base ERP (Real)
+                </CardTitle>
+                <CardDescription className="text-white/90">
+                  Importe dados reais do seu Excel para mapear Conglomerados e ERPs.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-8">
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/20 rounded-xl p-12 bg-muted/5 relative">
+                  
+                  {/* O input só aparece e cobre a área se não houver arquivo selecionado */}
+                  {!selectedFile && (
                     <input 
                       type="file" 
                       ref={fileInputRef}
                       onChange={handleFileSelect}
                       accept=".xlsx, .xls"
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      disabled={isImporting}
                     />
-                    
-                    {selectedFile ? (
-                      <div className="flex flex-col items-center animate-in zoom-in-95 duration-200">
-                        <div className="bg-secondary/10 p-6 rounded-full mb-4">
-                          <CheckCircle2 className="h-10 w-10 text-secondary" />
-                        </div>
-                        <h3 className="text-lg font-bold mb-1">{selectedFile.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-6">Arquivo pronto para processamento.</p>
-                        <div className="flex gap-3">
-                           <Button 
-                             onClick={(e) => { e.stopPropagation(); setSelectedFile(null); if(fileInputRef.current) fileInputRef.current.value = ""; }}
-                             variant="outline"
-                             className="gap-2"
-                           >
-                             <X className="h-4 w-4" /> Cancelar
-                           </Button>
-                           <Button 
-                            onClick={handleImport}
-                            className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 px-8"
-                            disabled={isImporting}
-                          >
-                            {isImporting ? <Loader2 className="animate-spin h-4 w-4" /> : <Upload className="h-4 w-4" />}
-                            {isImporting ? "Processando..." : "Confirmar Importação"}
-                          </Button>
-                        </div>
+                  )}
+                  
+                  {selectedFile ? (
+                    <div className="flex flex-col items-center z-20">
+                      <div className="bg-secondary/10 p-6 rounded-full mb-4">
+                        <CheckCircle2 className="h-10 w-10 text-secondary" />
                       </div>
-                    ) : (
-                      <div className="flex flex-col items-center text-center">
-                        <div className="bg-primary/10 p-6 rounded-full mb-4">
-                          <FileUp className="h-10 w-10 text-primary" />
-                        </div>
-                        <h3 className="text-lg font-bold mb-2">Clique ou arraste seu arquivo Excel</h3>
-                        <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                          O sistema processará a <strong>Coluna C (Conglomerado)</strong> e a <strong>Coluna E (Cód ERP Mãe)</strong>.
-                        </p>
-                        <Badge variant="secondary" className="bg-accent/30 text-accent-foreground border-accent/20">
-                          Suporta códigos separados por vírgula na Coluna E
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-
-                  {erpMappings && erpMappings.length > 0 && (
-                    <div className="mt-10 space-y-4">
-                      <div className="flex items-center justify-between border-b pb-2">
-                        <h4 className="font-bold text-primary flex items-center gap-2">
-                          <CheckCircle2 className="h-5 w-5" />
-                          Histórico de Mapeamentos (Cloud)
-                        </h4>
-                        <span className="text-xs text-muted-foreground font-mono uppercase tracking-widest">{erpMappings.length} Registros</span>
-                      </div>
-                      
-                      <div className="border rounded-lg overflow-hidden">
-                        <Table>
-                          <TableHeader className="bg-muted/50">
-                            <TableRow>
-                              <TableHead className="w-[30%]">Conglomerado (Coluna C)</TableHead>
-                              <TableHead>Códigos ERP Mãe (Coluna E)</TableHead>
-                              <TableHead className="text-right">Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {erpMappings.slice(0, 10).map((row: any) => (
-                              <TableRow key={row.id}>
-                                <TableCell className="font-bold text-sm">{row.conglomerado}</TableCell>
-                                <TableCell>
-                                  <div className="flex flex-wrap gap-1">
-                                    {row.erpMaeCodes.map((code: string, i: number) => (
-                                      <Badge key={i} variant="outline" className="text-[10px] border-primary/30 bg-primary/5 text-primary">
-                                        {code}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Badge className="bg-secondary text-white text-[10px]">Ativo no Sistema</Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                      <h3 className="text-lg font-bold mb-1">{selectedFile.name}</h3>
+                      <p className="text-sm text-muted-foreground mb-6">Arquivo pronto para processamento.</p>
+                      <div className="flex gap-3">
+                         <Button 
+                           onClick={() => { setSelectedFile(null); if(fileInputRef.current) fileInputRef.current.value = ""; }}
+                           variant="outline"
+                           className="gap-2"
+                         >
+                           <X className="h-4 w-4" /> Cancelar
+                         </Button>
+                         <Button 
+                          onClick={handleImport}
+                          className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 px-8"
+                          disabled={isImporting}
+                        >
+                          {isImporting ? <Loader2 className="animate-spin h-4 w-4" /> : <Upload className="h-4 w-4" />}
+                          {isImporting ? "Salvando..." : "Confirmar Importação"}
+                        </Button>
                       </div>
                     </div>
+                  ) : (
+                    <div className="flex flex-col items-center text-center">
+                      <div className="bg-primary/10 p-6 rounded-full mb-4">
+                        <FileUp className="h-10 w-10 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-bold mb-2">Selecione sua planilha Excel</h3>
+                      <p className="text-sm text-muted-foreground mb-4 max-w-md">
+                        Mapeamento automático: <strong>Coluna C</strong> para Conglomerado e <strong>Coluna E</strong> para ERPs.
+                      </p>
+                      <Badge variant="outline" className="text-xxs border-primary/20 text-primary">
+                        Suporta múltiplos ERPs separados por vírgula na Coluna E
+                      </Badge>
+                    </div>
                   )}
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+
+                {erpMappings && erpMappings.length > 0 && (
+                  <div className="mt-8 space-y-4">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <h4 className="font-bold text-primary flex items-center gap-2">
+                        <RefreshCw className="h-4 w-4" />
+                        Últimos Registros no Banco (Cloud)
+                      </h4>
+                      <Badge variant="secondary">{erpMappings.length} Registros</Badge>
+                    </div>
+                    
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader className="bg-muted/50">
+                          <TableRow>
+                            <TableHead className="text-xxs uppercase">Conglomerado</TableHead>
+                            <TableHead className="text-xxs uppercase">ERP's Vinculados</TableHead>
+                            <TableHead className="text-right text-xxs uppercase">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {erpMappings.slice(0, 5).map((row: any) => (
+                            <TableRow key={row.id}>
+                              <TableCell className="font-bold text-xs">{row.conglomerado}</TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1">
+                                  {row.erpMaeCodes.map((code: string, i: number) => (
+                                    <Badge key={i} variant="outline" className="text-[10px] bg-secondary/5 text-secondary border-secondary/20">
+                                      {code}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge className="bg-secondary text-white text-[9px]">Sincronizado</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
