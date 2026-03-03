@@ -37,7 +37,7 @@ export default function OrderFulfillmentDashboard() {
   const app = useFirebaseApp();
   const { toast } = useToast();
 
-  const projectId = (app.options as any).projectId;
+  const projectId = app.options.projectId;
 
   const erpMappingsQuery = useMemo(() => {
     if (!db) return null;
@@ -104,7 +104,7 @@ export default function OrderFulfillmentDashboard() {
 
       toast({
         title: "Sucesso!",
-        description: `${count} registros estão sendo sincronizados com o banco de dados.`,
+        description: `${count} registros estão sendo sincronizados com o banco de dados real.`,
       });
       
       setSelectedFile(null);
@@ -149,7 +149,6 @@ export default function OrderFulfillmentDashboard() {
           </div>
 
           <TabsContent value="dashboard" className="mt-0">
-             {/* Layout de Grade Densa */}
             <div className="bg-surface-light dark:bg-surface-dark shadow-xl rounded-lg overflow-hidden border border-border-light dark:border-border-dark">
               <header className="bg-primary text-white text-center py-3 font-bold text-xl uppercase tracking-wide border-b border-white dark:border-gray-700">
                 Etapas do Processo de Atendimento de Pedidos
@@ -175,14 +174,13 @@ export default function OrderFulfillmentDashboard() {
               <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
                 <div className="bg-white dark:bg-surface-dark border-r border-b border-gray-200 dark:border-gray-700"></div>
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <React.Fragment key={i}>
+                  <React.Fragment key={`header-cols-${i}`}>
                     <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-gray-400">Forma</div>
                     <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-white">%</div>
                   </React.Fragment>
                 ))}
               </div>
 
-              {/* Seção de Automação Visual */}
               <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
                 <div className="bg-secondary text-white font-bold flex items-center justify-center text-center p-2 border-r border-b border-white dark:border-gray-700 text-lg">
                   Processos Automatizados
@@ -220,15 +218,14 @@ export default function OrderFulfillmentDashboard() {
                 </div>
               </div>
 
-              {/* Conglomerados Dinâmicos do Banco */}
               <div className="bg-gray-600 text-white text-center py-1 font-bold text-xs uppercase tracking-tighter">
-                Conglomerados e ERPs Sincronizados (Tempo Real)
+                Conglomerados e ERPs Sincronizados em Tempo Real
               </div>
               
               <div className="max-h-[300px] overflow-y-auto bg-white dark:bg-surface-dark">
                 {isLoadingData && (
                   <div className="p-8 text-center text-muted-foreground">
-                    <Loader2 className="animate-spin inline mr-2 h-4 w-4" /> Sincronizando dados da nuvem...
+                    <Loader2 className="animate-spin inline mr-2 h-4 w-4" /> Sincronizando com Firestore...
                   </div>
                 )}
                 {erpMappings?.map((mapping: any) => (
@@ -286,11 +283,11 @@ export default function OrderFulfillmentDashboard() {
                       Importação de Base ERP
                     </CardTitle>
                     <CardDescription className="text-white/90">
-                      Seu arquivo deve ter o Conglomerado na Coluna C e ERPs na Coluna E.
+                      Envie sua planilha para o banco de dados real no Firestore.
                     </CardDescription>
                   </div>
                   <Badge variant="outline" className="bg-white/20 text-white border-white/40">
-                    Firestore: {projectId}
+                    Ativo: {projectId}
                   </Badge>
                 </div>
               </CardHeader>
@@ -313,7 +310,7 @@ export default function OrderFulfillmentDashboard() {
                         <CheckCircle2 className="h-10 w-10 text-secondary" />
                       </div>
                       <h3 className="text-lg font-bold mb-1">{selectedFile.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-6">Arquivo pronto para processamento no banco cloud.</p>
+                      <p className="text-sm text-muted-foreground mb-6">Arquivo pronto para ser enviado à nuvem.</p>
                       <div className="flex gap-3">
                          <Button 
                            onClick={() => { setSelectedFile(null); if(fileInputRef.current) fileInputRef.current.value = ""; }}
@@ -328,7 +325,7 @@ export default function OrderFulfillmentDashboard() {
                           disabled={isImporting}
                         >
                           {isImporting ? <Loader2 className="animate-spin h-4 w-4" /> : <Upload className="h-4 w-4" />}
-                          {isImporting ? "Enviando Dados..." : "Confirmar Importação Real"}
+                          {isImporting ? "Salvando..." : "Confirmar Importação Real"}
                         </Button>
                       </div>
                     </div>
@@ -339,10 +336,10 @@ export default function OrderFulfillmentDashboard() {
                       </div>
                       <h3 className="text-lg font-bold mb-2">Selecione sua planilha Excel</h3>
                       <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                        Mapeamento automático: <strong>Coluna C</strong> para Conglomerado e <strong>Coluna E</strong> para ERPs.
+                        Mapeamento: <strong>Coluna C</strong> (Conglomerado) e <strong>Coluna E</strong> (ERPs).
                       </p>
                       <Badge variant="outline" className="text-xxs border-primary/20 text-primary">
-                        Suporta múltiplos ERPs separados por vírgula na Coluna E
+                        Suporta ERPs separados por vírgula na Coluna E
                       </Badge>
                     </div>
                   )}
@@ -390,9 +387,6 @@ export default function OrderFulfillmentDashboard() {
                         </TableBody>
                       </Table>
                     </div>
-                    {erpMappings.length > 10 && (
-                       <p className="text-center text-[10px] text-muted-foreground italic">Exibindo os 10 registros mais recentes de {erpMappings.length} no banco de dados.</p>
-                    )}
                   </div>
                 )}
               </CardContent>
@@ -401,8 +395,9 @@ export default function OrderFulfillmentDashboard() {
             <div className="mt-6 flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
                <AlertTriangle className="h-4 w-4 shrink-0" />
                <p>
-                 <strong>Nota de Depuração:</strong> Se você importou os dados e eles aparecem aqui mas não no seu Console do Firebase, 
-                 verifique se o <strong>ID do Projeto ({projectId})</strong> exibido no topo da página é o mesmo que você está visualizando no navegador.
+                 <strong>Nota de Depuração:</strong> Se você importou os dados e eles não aparecem no console, verifique se as 
+                 <strong> Regras de Segurança (Rules)</strong> do Firestore no Console do Firebase permitem gravação. 
+                 ID do Projeto Atual: <strong>{projectId}</strong>.
                </p>
             </div>
           </TabsContent>
