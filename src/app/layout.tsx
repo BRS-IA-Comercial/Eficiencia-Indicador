@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase';
 import { Toaster } from '@/components/ui/toaster';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 export const metadata: Metadata = {
   title: 'Dashboard de Atendimento de Pedidos',
@@ -23,6 +24,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased bg-background-light dark:bg-background-dark text-gray-800 dark:text-gray-200">
         <FirebaseClientProvider>
+          <FirebaseErrorListener />
           {children}
           <Toaster />
         </FirebaseClientProvider>

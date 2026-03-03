@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef } from "react";
@@ -12,21 +11,20 @@ import {
   FileUp,
   X,
   Brain,
-  Search,
-  Bell,
   RefreshCw,
-  TrendingUp,
-  Activity,
-  CheckCircle
+  Database,
+  AlertTriangle
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useFirestore, useCollection } from "@/firebase";
+import { useFirestore, useCollection, useFirebaseApp } from "@/firebase";
 import { collection, addDoc, serverTimestamp, query, orderBy } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import * as XLSX from "xlsx";
 
 export default function OrderFulfillmentDashboard() {
@@ -34,10 +32,13 @@ export default function OrderFulfillmentDashboard() {
   const [isImporting, setIsImporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const db = useFirestore();
+  const app = useFirebaseApp();
   const { toast } = useToast();
 
-  // Busca real dos dados do Firestore para exibição
+  const projectId = (app.options as any).projectId;
+
   const erpMappingsQuery = useMemo(() => {
     if (!db) return null;
     return query(collection(db, "erp_mappings"), orderBy("importedAt", "desc"));
@@ -53,7 +54,7 @@ export default function OrderFulfillmentDashboard() {
   };
 
   const handleImport = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Garante que o clique não suba para o seletor de arquivo
+    e.stopPropagation();
     if (!db || !selectedFile) return;
 
     setIsImporting(true);
@@ -64,17 +65,16 @@ export default function OrderFulfillmentDashboard() {
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       
-      // Converter para JSON (matriz de arrays para pegar as colunas C e E)
       const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
       
       const erpMappingsRef = collection(db, "erp_mappings");
       let count = 0;
 
-      // Iterar pelas linhas (pulando o cabeçalho)
-      for (let i = 1; i < rows.length; i++) {
+      for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const conglomerado = row[2]; // Coluna C (índice 2)
-        const erpMaeRaw = row[4];   // Coluna E (índice 4)
+        // Coluna C é índice 2, Coluna E é índice 4
+        const conglomerado = row[2];
+        const erpMaeRaw = row[4];
 
         if (conglomerado && erpMaeRaw) {
           const erpCodes = String(erpMaeRaw)
@@ -82,14 +82,21 @@ export default function OrderFulfillmentDashboard() {
             .map(code => code.trim())
             .filter(code => code !== "");
           
-          // Gravação no Firestore
-          addDoc(erpMappingsRef, {
+          const payload = {
             conglomerado: String(conglomerado),
             erpMaeCodes: erpCodes,
             importedAt: serverTimestamp()
-          }).catch(err => {
-            console.error("Erro ao salvar no banco:", err);
-          });
+          };
+
+          addDoc(erpMappingsRef, payload)
+            .catch(async (serverError) => {
+              const permissionError = new FirestorePermissionError({
+                path: erpMappingsRef.path,
+                operation: 'create',
+                requestResourceData: payload,
+              } satisfies SecurityRuleContext);
+              errorEmitter.emit('permission-error', permissionError);
+            });
           
           count++;
         }
@@ -97,7 +104,7 @@ export default function OrderFulfillmentDashboard() {
 
       toast({
         title: "Sucesso!",
-        description: `${count} registros foram enviados para o banco de dados.`,
+        description: `${count} registros estão sendo sincronizados com o banco de dados.`,
       });
       
       setSelectedFile(null);
@@ -130,18 +137,24 @@ export default function OrderFulfillmentDashboard() {
                 Configuração
               </TabsTrigger>
             </TabsList>
-            <div className="text-xxs font-bold text-muted-foreground uppercase tracking-widest bg-white dark:bg-surface-dark px-3 py-1 rounded border">
-              Fluxo Vision v3.1 - Cloud Realtime
+            <div className="flex items-center gap-4">
+               <Badge variant="outline" className="bg-white gap-2 px-3 py-1 border-primary/20 text-primary">
+                  <Database className="h-3 w-3" />
+                  ID Projeto: <span className="font-bold">{projectId}</span>
+               </Badge>
+               <div className="text-xxs font-bold text-muted-foreground uppercase tracking-widest bg-white dark:bg-surface-dark px-3 py-1 rounded border">
+                Fluxo Vision v3.2 - Cloud Sync
+              </div>
             </div>
           </div>
 
           <TabsContent value="dashboard" className="mt-0">
+             {/* Layout de Grade Densa */}
             <div className="bg-surface-light dark:bg-surface-dark shadow-xl rounded-lg overflow-hidden border border-border-light dark:border-border-dark">
               <header className="bg-primary text-white text-center py-3 font-bold text-xl uppercase tracking-wide border-b border-white dark:border-gray-700">
                 Etapas do Processo de Atendimento de Pedidos
               </header>
 
-              {/* Grid 1: Cabeçalhos das Etapas */}
               <div className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm">
                 <div className="bg-white dark:bg-surface-dark border-r border-b border-gray-200 dark:border-gray-700"></div>
                 {[
@@ -159,7 +172,6 @@ export default function OrderFulfillmentDashboard() {
                 ))}
               </div>
 
-              {/* Grid 2: Forma e % */}
               <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
                 <div className="bg-white dark:bg-surface-dark border-r border-b border-gray-200 dark:border-gray-700"></div>
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -170,15 +182,53 @@ export default function OrderFulfillmentDashboard() {
                 ))}
               </div>
 
-              {/* Conteúdo Dinâmico (Conglomerados) */}
+              {/* Seção de Automação Visual */}
+              <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
+                <div className="bg-secondary text-white font-bold flex items-center justify-center text-center p-2 border-r border-b border-white dark:border-gray-700 text-lg">
+                  Processos Automatizados
+                </div>
+                <div className="col-span-2 grid grid-cols-2 grid-rows-3">
+                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700">Painel SIC</div>
+                  <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">79,2%</div>
+                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700"><Brain className="h-3 w-3 mr-1" /> PDF IA</div>
+                  <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">5,2%</div>
+                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700 leading-tight">Painel Automático</div>
+                  <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">0,0%</div>
+                </div>
+                <div className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700">
+                  <span className="text-[10px] mb-1">Automático</span>
+                  <span className="text-2xl font-bold">95,3%</span>
+                </div>
+                <div className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700">
+                  <span className="text-[10px] mb-1">Automático</span>
+                  <span className="text-2xl font-bold">28,5%</span>
+                </div>
+                <div className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700">
+                  <span className="text-[10px] mb-1">Automático</span>
+                  <span className="text-2xl font-bold">35,3%</span>
+                </div>
+                <div className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700">
+                  <span className="text-[10px] mb-1 text-center">Agente Rupturas</span>
+                  <span className="text-2xl font-bold">1,9%</span>
+                </div>
+                <div className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-b border-white dark:border-gray-700">
+                  <span className="text-[10px] mb-1 flex items-center flex-col text-center leading-none">
+                    <Brain className="h-3 w-3 mb-1" />
+                    Agente IA
+                  </span>
+                  <span className="text-2xl font-bold">0,0%</span>
+                </div>
+              </div>
+
+              {/* Conglomerados Dinâmicos do Banco */}
               <div className="bg-gray-600 text-white text-center py-1 font-bold text-xs uppercase tracking-tighter">
-                Conglomerados e ERPs Mapeados no Sistema
+                Conglomerados e ERPs Sincronizados (Tempo Real)
               </div>
               
-              <div className="max-h-[300px] overflow-y-auto">
+              <div className="max-h-[300px] overflow-y-auto bg-white dark:bg-surface-dark">
                 {isLoadingData && (
-                  <div className="p-8 text-center text-muted-foreground bg-white dark:bg-surface-dark">
-                    <Loader2 className="animate-spin inline mr-2 h-4 w-4" /> Sincronizando dados reais...
+                  <div className="p-8 text-center text-muted-foreground">
+                    <Loader2 className="animate-spin inline mr-2 h-4 w-4" /> Sincronizando dados da nuvem...
                   </div>
                 )}
                 {erpMappings?.map((mapping: any) => (
@@ -186,24 +236,23 @@ export default function OrderFulfillmentDashboard() {
                     <div className="bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 font-bold px-3 py-1 flex items-center text-xxs border-r border-white dark:border-gray-700">
                       {mapping.conglomerado}
                     </div>
-                    <div className="px-3 py-1 flex gap-1 items-center flex-wrap bg-white dark:bg-surface-dark">
+                    <div className="px-3 py-1 flex gap-1 items-center flex-wrap">
                       {mapping.erpMaeCodes.map((code: string, i: number) => (
-                        <Badge key={i} variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[9px] h-4 py-0">{code}</Badge>
+                        <Badge key={i} variant="secondary" className="bg-secondary/10 text-secondary border-secondary/20 text-[9px] h-4 py-0">{code}</Badge>
                       ))}
                     </div>
                   </div>
                 ))}
                 {!isLoadingData && (!erpMappings || erpMappings.length === 0) && (
-                  <div className="p-8 text-center text-muted-foreground italic bg-white dark:bg-surface-dark text-xs">
-                    Nenhum mapeamento no banco. Importe um Excel na aba de Configuração.
+                  <div className="p-8 text-center text-muted-foreground italic text-xs">
+                    Nenhum mapeamento encontrado no Projeto: {projectId}. Importe um Excel na aba Configuração.
                   </div>
                 )}
               </div>
 
-              {/* Tabela de Gestores (Estática conforme modelo) */}
               <div className="grid grid-cols-[220px_1fr] border-t-2 border-gray-400">
                 <div className="bg-gray-600 text-white text-center py-2 font-bold text-sm">Gestores</div>
-                <div className="bg-gray-600 text-white text-center py-2 font-bold text-sm">Detalhamento por Cliente</div>
+                <div className="bg-gray-600 text-white text-center py-2 font-bold text-lg">Detalhamento por Gestor</div>
               </div>
               
               <div className="bg-gray-100 dark:bg-gray-800">
@@ -230,18 +279,24 @@ export default function OrderFulfillmentDashboard() {
           <TabsContent value="configuracao" className="mt-0">
             <Card className="shadow-lg border-primary/20">
               <CardHeader className="bg-primary text-white rounded-t-lg">
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <FileSpreadsheet className="h-6 w-6" />
-                  Importação de Base ERP (Real)
-                </CardTitle>
-                <CardDescription className="text-white/90">
-                  Importe dados reais do seu Excel para mapear Conglomerados e ERPs.
-                </CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-xl flex items-center gap-2">
+                      <FileSpreadsheet className="h-6 w-6" />
+                      Importação de Base ERP
+                    </CardTitle>
+                    <CardDescription className="text-white/90">
+                      Seu arquivo deve ter o Conglomerado na Coluna C e ERPs na Coluna E.
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="bg-white/20 text-white border-white/40">
+                    Firestore: {projectId}
+                  </Badge>
+                </div>
               </CardHeader>
               <CardContent className="p-8">
                 <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/20 rounded-xl p-12 bg-muted/5 relative">
                   
-                  {/* O input só aparece e cobre a área se não houver arquivo selecionado */}
                   {!selectedFile && (
                     <input 
                       type="file" 
@@ -258,7 +313,7 @@ export default function OrderFulfillmentDashboard() {
                         <CheckCircle2 className="h-10 w-10 text-secondary" />
                       </div>
                       <h3 className="text-lg font-bold mb-1">{selectedFile.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-6">Arquivo pronto para processamento.</p>
+                      <p className="text-sm text-muted-foreground mb-6">Arquivo pronto para processamento no banco cloud.</p>
                       <div className="flex gap-3">
                          <Button 
                            onClick={() => { setSelectedFile(null); if(fileInputRef.current) fileInputRef.current.value = ""; }}
@@ -269,11 +324,11 @@ export default function OrderFulfillmentDashboard() {
                          </Button>
                          <Button 
                           onClick={handleImport}
-                          className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 px-8"
+                          className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 px-8 shadow-md"
                           disabled={isImporting}
                         >
                           {isImporting ? <Loader2 className="animate-spin h-4 w-4" /> : <Upload className="h-4 w-4" />}
-                          {isImporting ? "Salvando..." : "Confirmar Importação"}
+                          {isImporting ? "Enviando Dados..." : "Confirmar Importação Real"}
                         </Button>
                       </div>
                     </div>
@@ -298,9 +353,11 @@ export default function OrderFulfillmentDashboard() {
                     <div className="flex items-center justify-between border-b pb-2">
                       <h4 className="font-bold text-primary flex items-center gap-2">
                         <RefreshCw className="h-4 w-4" />
-                        Últimos Registros no Banco (Cloud)
+                        Histórico de Sincronização Cloud
                       </h4>
-                      <Badge variant="secondary">{erpMappings.length} Registros</Badge>
+                      <div className="flex gap-2">
+                         <Badge variant="secondary" className="bg-secondary text-white">{erpMappings.length} Registros</Badge>
+                      </div>
                     </div>
                     
                     <div className="border rounded-lg overflow-hidden">
@@ -313,7 +370,7 @@ export default function OrderFulfillmentDashboard() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {erpMappings.slice(0, 5).map((row: any) => (
+                          {erpMappings.slice(0, 10).map((row: any) => (
                             <TableRow key={row.id}>
                               <TableCell className="font-bold text-xs">{row.conglomerado}</TableCell>
                               <TableCell>
@@ -326,17 +383,28 @@ export default function OrderFulfillmentDashboard() {
                                 </div>
                               </TableCell>
                               <TableCell className="text-right">
-                                <Badge className="bg-secondary text-white text-[9px]">Sincronizado</Badge>
+                                <Badge className="bg-secondary text-white text-[9px] uppercase">Sincronizado</Badge>
                               </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
+                    {erpMappings.length > 10 && (
+                       <p className="text-center text-[10px] text-muted-foreground italic">Exibindo os 10 registros mais recentes de {erpMappings.length} no banco de dados.</p>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
+            
+            <div className="mt-6 flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
+               <AlertTriangle className="h-4 w-4 shrink-0" />
+               <p>
+                 <strong>Nota de Depuração:</strong> Se você importou os dados e eles aparecem aqui mas não no seu Console do Firebase, 
+                 verifique se o <strong>ID do Projeto ({projectId})</strong> exibido no topo da página é o mesmo que você está visualizando no navegador.
+               </p>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
