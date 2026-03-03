@@ -19,13 +19,13 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
-// Dados simulados baseados na imagem do Excel fornecida
+// Dados simulados atualizados com suporte a múltiplos ERP's (Coluna E)
 const MOCK_ERP_DATA = [
-  { id: "1657", conglomerado: "SEGER ES", erpMae: "0001187025" },
+  { id: "1657", conglomerado: "SEGER ES", erpMae: "0001187025, 0001187026" },
   { id: "1656", conglomerado: "BLAU FARMACEUTICA", erpMae: "0001068874" },
-  { id: "1655", conglomerado: "TECVERDE", erpMae: "0001180186" },
+  { id: "1655", conglomerado: "TECVERDE", erpMae: "0001180186, 0001180190, 0001180200" },
   { id: "1654", conglomerado: "HAPVIDA", erpMae: "0001185388" },
-  { id: "1653", conglomerado: "STRATOS", erpMae: "0001109747" },
+  { id: "1653", conglomerado: "STRATOS", erpMae: "0001109747, 0001109750" },
   { id: "1652", conglomerado: "SOPRANO", erpMae: "0000027973" },
 ];
 
@@ -96,14 +96,14 @@ export default function OrderFulfillmentDashboard() {
               <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
                 <div className="bg-white dark:bg-surface-dark border-r border-b border-gray-200 dark:border-gray-700"></div>
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <React.Fragment key={`sub-header-${i}`}>
+                  <Fragment key={`sub-header-${i}`}>
                     <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-gray-400">
                       Forma
                     </div>
                     <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-white last:border-r-0">
                       %
                     </div>
-                  </React.Fragment>
+                  </Fragment>
                 ))}
               </div>
 
@@ -113,17 +113,28 @@ export default function OrderFulfillmentDashboard() {
                   Processos Automatizados
                 </div>
                 <div className="col-span-2 grid grid-cols-2 grid-rows-3">
-                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700">Painel de Liberação SIC</div>
+                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700 leading-tight">Painel de Liberação SIC</div>
                   <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">79,2%</div>
-                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700">PDF - IA <Brain className="h-3 w-3 ml-1" /></div>
+                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700">
+                    PDF - IA <Brain className="h-3 w-3 ml-1" />
+                  </div>
                   <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">5,2%</div>
-                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700">Painel Pré Pedidos Automático</div>
+                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700 leading-tight">Painel Pré Pedidos Automático</div>
                   <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">0,0%</div>
                 </div>
-                {["95,3%", "28,5%", "35,3%", "1,9%", "0,0%"].map((val, idx) => (
+                {[
+                  { label: "Automático", val: "95,3%" },
+                  { label: "Automático", val: "28,5%" },
+                  { label: "Automático", val: "35,3%" },
+                  { label: "Agente Rupturas", val: "1,9%" },
+                  { label: "Agente IA", val: "0,0%", icon: true },
+                ].map((item, idx) => (
                   <div key={`auto-${idx}`} className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700 last:border-r-0">
-                    <span className="text-xs mb-1">{idx === 4 ? <Brain className="h-4 w-4" /> : "Automático"}</span>
-                    <span className="text-2xl font-bold">{val}</span>
+                    <span className="text-[10px] mb-1 flex items-center gap-1 uppercase font-bold opacity-80">
+                      {item.icon && <Brain className="h-3 w-3" />}
+                      {item.label}
+                    </span>
+                    <span className="text-2xl font-bold">{item.val}</span>
                   </div>
                 ))}
               </div>
@@ -134,23 +145,48 @@ export default function OrderFulfillmentDashboard() {
                   Processos Manuais
                 </div>
                 <div className="col-span-2 grid grid-cols-2 grid-rows-4">
-                  <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-gray-400">Manual</div>
+                  <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-gray-400 leading-tight">Painel Pré Pedidos Manual</div>
                   <div className="bg-neutral text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">7,9%</div>
-                  <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-gray-400">PDF</div>
+                  <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-gray-400 leading-tight">PDF</div>
                   <div className="bg-neutral text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">1,3%</div>
-                  <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-gray-400">Excel</div>
+                  <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-gray-400 leading-tight">Importação Excel</div>
                   <div className="bg-neutral text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">5,8%</div>
-                  <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-gray-400">Web</div>
+                  <div className="bg-neutral text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-gray-400 leading-tight">Webservice</div>
                   <div className="bg-neutral text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">0,7%</div>
                 </div>
                 {["4,7%", "71,5%", "64,7%", "98,1%", "100,0%"].map((val, idx) => (
                   <div key={`manual-${idx}`} className="col-span-2 bg-neutral text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700 last:border-r-0">
-                    <span className="text-xs mb-1">Manual</span>
+                    <span className="text-[10px] mb-1 uppercase font-bold opacity-80">Manual</span>
                     <span className="text-2xl font-bold">{val}</span>
                   </div>
                 ))}
               </div>
 
+              {/* Peso da Etapa */}
+              <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
+                <div className="bg-gray-500 text-white font-bold flex items-center justify-end pr-4 text-center p-2 border-r border-b border-white dark:border-gray-700 text-lg uppercase tracking-tight">
+                  Peso da Etapa
+                </div>
+                {[
+                  { n: "425", p: "6,2%" },
+                  { n: "122", p: "1,8%" },
+                  { n: "632", p: "9,2%" },
+                  { n: "285", p: "4,1%" },
+                  { n: "3080", p: "44,7%" },
+                  { n: "2345", p: "34,0%" },
+                ].map((item, idx) => (
+                  <Fragment key={`peso-${idx}`}>
+                    <div className="bg-gray-500 text-white flex items-center justify-center font-bold border-r border-b border-gray-400">
+                      {item.n}
+                    </div>
+                    <div className="bg-gray-500 text-white flex items-center justify-center font-bold text-lg border-r border-b border-white dark:border-gray-700 last:border-r-0">
+                      {item.p}
+                    </div>
+                  </Fragment>
+                ))}
+              </div>
+
+              {/* Total Geral */}
               <div className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm font-bold text-xl text-black">
                 <div className="bg-white dark:bg-surface-dark border-r border-b border-gray-300"></div>
                 {["84,4%", "95,3%", "28,5%", "35,3%", "1,9%", "0,0%"].map((val, idx) => (
@@ -189,7 +225,9 @@ export default function OrderFulfillmentDashboard() {
                     </div>
                     <h3 className="text-lg font-bold mb-2">Arraste seu arquivo Excel aqui</h3>
                     <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
-                      O sistema processará automaticamente a <strong>Coluna C (Conglomerado)</strong> e a <strong>Coluna E (Cód ERP Mãe)</strong> do seu documento.
+                      O sistema processará a <strong>Coluna C (Conglomerado)</strong> e a <strong>Coluna E (Cód ERP Mãe)</strong>. 
+                      <br />
+                      <span className="text-primary font-semibold">Os ERP's na coluna E podem ser separados por vírgula.</span>
                     </p>
                     
                     <div className="flex gap-4">
@@ -224,7 +262,7 @@ export default function OrderFulfillmentDashboard() {
                             <TableRow>
                               <TableHead className="w-[100px]">ID</TableHead>
                               <TableHead>Coluna C: Conglomerado</TableHead>
-                              <TableHead>Coluna E: Cód ERP Mãe</TableHead>
+                              <TableHead>Coluna E: Cód ERP Mãe (Mult.)</TableHead>
                               <TableHead className="text-right">Status</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -233,7 +271,13 @@ export default function OrderFulfillmentDashboard() {
                               <TableRow key={row.id}>
                                 <TableCell className="font-mono text-xs">{row.id}</TableCell>
                                 <TableCell className="font-bold">{row.conglomerado}</TableCell>
-                                <TableCell className="font-mono text-primary font-bold">{row.erpMae}</TableCell>
+                                <TableCell className="font-mono text-primary font-bold">
+                                  {row.erpMae.split(',').map((code, i) => (
+                                    <Badge key={i} variant="outline" className="mr-1 mb-1 border-primary/30 bg-primary/5 text-primary">
+                                      {code.trim()}
+                                    </Badge>
+                                  ))}
+                                </TableCell>
                                 <TableCell className="text-right">
                                   <Badge className="bg-secondary text-white">Mapeado</Badge>
                                 </TableCell>
@@ -250,7 +294,7 @@ export default function OrderFulfillmentDashboard() {
                       <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
                       <div className="text-sm text-amber-800 dark:text-amber-200">
                         <p className="font-bold">Nota de Importação:</p>
-                        <p>Certifique-se de que o arquivo segue o padrão: a terceira coluna (C) deve conter o nome do cliente/conglomerado e a quinta coluna (E) o código identificador do ERP.</p>
+                        <p>O sistema agora reconhece múltiplos códigos na quinta coluna (E). Basta separá-los por vírgula no Excel (Ex: "001, 002, 003").</p>
                       </div>
                     </div>
                   )}
