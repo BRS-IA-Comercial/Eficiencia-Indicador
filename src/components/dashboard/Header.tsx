@@ -20,7 +20,7 @@ export function Header() {
       <div className="flex items-center gap-8 flex-1">
         <div className="relative w-full max-w-md hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search processes, orders, reports..." className="pl-10 bg-secondary/50 border-transparent focus:bg-white focus:border-primary/20 transition-all rounded-full" />
+          <Input placeholder="Buscar processos, pedidos, relatórios..." className="pl-10 bg-secondary/50 border-transparent focus:bg-white focus:border-primary/20 transition-all rounded-full" />
         </div>
         
         <div className="flex items-center gap-6">
@@ -29,8 +29,8 @@ export function Header() {
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className="text-[10px] uppercase font-bold text-muted-foreground leading-none">Global S&OP</p>
-              <p className="text-sm font-bold">92.4% <span className="text-primary text-[10px]">+2.1%</span></p>
+              <p className="text-[10px] uppercase font-bold text-muted-foreground leading-none">S&OP Global</p>
+              <p className="text-sm font-bold">92,4% <span className="text-primary text-[10px]">+2,1%</span></p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -38,8 +38,8 @@ export function Header() {
               <Activity className="h-4 w-4 text-accent-foreground" />
             </div>
             <div>
-              <p className="text-[10px] uppercase font-bold text-muted-foreground leading-none">Daily Load</p>
-              <p className="text-sm font-bold">1.2k ops</p>
+              <p className="text-[10px] uppercase font-bold text-muted-foreground leading-none">Carga Diária</p>
+              <p className="text-sm font-bold">1,2k ops</p>
             </div>
           </div>
         </div>

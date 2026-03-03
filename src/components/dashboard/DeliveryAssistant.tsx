@@ -27,7 +27,7 @@ export function DeliveryAssistant() {
     setMessages(prev => [...prev, userMsg]);
     setInput("");
 
-    // Simulated AI response
+    // Resposta simulada da IA
     setTimeout(() => {
       const assistantMsg = { 
         role: "assistant", 
@@ -47,8 +47,8 @@ export function DeliveryAssistant() {
                 <Bot className="h-6 w-6" />
               </div>
               <div>
-                <CardTitle>Delivery AI Assistant</CardTitle>
-                <CardDescription className="text-primary-foreground/70">Expert resolver for logistics exceptions</CardDescription>
+                <CardTitle>Assistente de IA de Entregas</CardTitle>
+                <CardDescription className="text-primary-foreground/70">Especialista em resolução de exceções logísticas</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -74,7 +74,7 @@ export function DeliveryAssistant() {
           <CardFooter className="p-4 border-t bg-muted/20">
             <div className="flex w-full gap-2">
               <Input 
-                placeholder="Type delivery problem details..." 
+                placeholder="Digite os detalhes do problema de entrega..." 
                 className="flex-1 bg-background"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -93,7 +93,7 @@ export function DeliveryAssistant() {
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
               <Lightbulb className="h-4 w-4 text-accent" />
-              Common Exceptions
+              Exceções Comuns
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -115,7 +115,7 @@ export function DeliveryAssistant() {
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-orange-500" />
-              Critical Occurrences
+              Ocorrências Críticas
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">

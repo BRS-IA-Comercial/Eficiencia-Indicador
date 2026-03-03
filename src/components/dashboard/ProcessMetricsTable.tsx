@@ -17,13 +17,13 @@ interface MetricRow {
 }
 
 const data: MetricRow[] = [
-  { stage: "Order Intake", automated: 450, manual: 50, pending: 12, avgTime: "2m", efficiency: 94, trend: "up" },
-  { stage: "Validation", automated: 480, manual: 20, pending: 5, avgTime: "1m", efficiency: 98, trend: "up" },
-  { stage: "Stock Check", automated: 500, manual: 0, pending: 2, avgTime: "30s", efficiency: 100, trend: "stable" },
-  { stage: "Picking", automated: 120, manual: 380, pending: 45, avgTime: "15m", efficiency: 82, trend: "down" },
-  { stage: "Packing", automated: 80, manual: 420, pending: 30, avgTime: "8m", efficiency: 88, trend: "up" },
-  { stage: "Shipping", automated: 490, manual: 10, pending: 8, avgTime: "3m", efficiency: 96, trend: "up" },
-  { stage: "Post-Sales", automated: 150, manual: 350, pending: 15, avgTime: "45m", efficiency: 75, trend: "down" },
+  { stage: "Entrada de Pedidos", automated: 450, manual: 50, pending: 12, avgTime: "2m", efficiency: 94, trend: "up" },
+  { stage: "Validação", automated: 480, manual: 20, pending: 5, avgTime: "1m", efficiency: 98, trend: "up" },
+  { stage: "Verificação de Estoque", automated: 500, manual: 0, pending: 2, avgTime: "30s", efficiency: 100, trend: "stable" },
+  { stage: "Separação (Picking)", automated: 120, manual: 380, pending: 45, avgTime: "15m", efficiency: 82, trend: "down" },
+  { stage: "Embalagem (Packing)", automated: 80, manual: 420, pending: 30, avgTime: "8m", efficiency: 88, trend: "up" },
+  { stage: "Envio", automated: 490, manual: 10, pending: 8, avgTime: "3m", efficiency: 96, trend: "up" },
+  { stage: "Pós-Venda", automated: 150, manual: 350, pending: 15, avgTime: "45m", efficiency: 75, trend: "down" },
 ];
 
 export function ProcessMetricsTable() {
@@ -31,12 +31,12 @@ export function ProcessMetricsTable() {
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
       <div className="p-4 border-b bg-muted/30 flex justify-between items-center">
         <h3 className="font-semibold text-lg flex items-center gap-2">
-          Fulfillment Pipeline Overview
-          <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider">Live Metrics</Badge>
+          Visão Geral do Pipeline de Fulfillment
+          <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider">Métricas em Tempo Real</Badge>
         </h3>
         <div className="flex gap-4 text-xs font-medium text-muted-foreground">
           <div className="flex items-center gap-1">
-            <Zap className="h-3 w-3 text-primary" /> Automated
+            <Zap className="h-3 w-3 text-primary" /> Automatizado
           </div>
           <div className="flex items-center gap-1">
             <User className="h-3 w-3 text-accent" /> Manual
@@ -46,12 +46,12 @@ export function ProcessMetricsTable() {
       <Table>
         <TableHeader className="bg-muted/10">
           <TableRow>
-            <TableHead className="w-[200px]">Stage</TableHead>
-            <TableHead>Execution Split</TableHead>
-            <TableHead className="text-center">Pending</TableHead>
-            <TableHead className="text-center">Avg Time</TableHead>
-            <TableHead className="w-[150px]">Efficiency</TableHead>
-            <TableHead className="text-right">Trend</TableHead>
+            <TableHead className="w-[200px]">Etapa</TableHead>
+            <TableHead>Divisão de Execução</TableHead>
+            <TableHead className="text-center">Pendente</TableHead>
+            <TableHead className="text-center">Tempo Médio</TableHead>
+            <TableHead className="w-[150px]">Eficiência</TableHead>
+            <TableHead className="text-right">Tendência</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

@@ -27,49 +27,49 @@ export default function DashboardPage() {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
                     <h1 className="text-3xl font-bold tracking-tight">FluxoPedidos Vision</h1>
-                    <p className="text-muted-foreground">Real-time fulfillment process metrics and execution control.</p>
+                    <p className="text-muted-foreground">Métricas de fulfillment em tempo real e controle de execução.</p>
                   </div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <Card className="hover:shadow-md transition-all border-l-4 border-l-primary">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Orders Today</CardTitle>
+                      <CardTitle className="text-sm font-medium">Total de Pedidos Hoje</CardTitle>
                       <Box className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">1,284</div>
-                      <p className="text-xs text-muted-foreground">+12.5% from yesterday</p>
+                      <div className="text-2xl font-bold">1.284</div>
+                      <p className="text-xs text-muted-foreground">+12,5% em relação a ontem</p>
                     </CardContent>
                   </Card>
                   <Card className="hover:shadow-md transition-all border-l-4 border-l-accent">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Auto-Fulfillment Rate</CardTitle>
+                      <CardTitle className="text-sm font-medium">Taxa de Automação</CardTitle>
                       <Activity className="h-4 w-4 text-accent-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">84.2%</div>
-                      <p className="text-xs text-muted-foreground">+5.4% improvement</p>
+                      <div className="text-2xl font-bold">84,2%</div>
+                      <p className="text-xs text-muted-foreground">+5,4% de melhoria</p>
                     </CardContent>
                   </Card>
                   <Card className="hover:shadow-md transition-all border-l-4 border-l-primary/40">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Manual Tasks Pending</CardTitle>
+                      <CardTitle className="text-sm font-medium">Tarefas Manuais Pendentes</CardTitle>
                       <ClipboardList className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">156</div>
-                      <p className="text-xs text-muted-foreground">32 priority critical</p>
+                      <p className="text-xs text-muted-foreground">32 prioridades críticas</p>
                     </CardContent>
                   </Card>
                   <Card className="hover:shadow-md transition-all border-l-4 border-l-primary">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Avg Cycle Time</CardTitle>
+                      <CardTitle className="text-sm font-medium">Tempo Médio de Ciclo</CardTitle>
                       <TrendingUp className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">42m 12s</div>
-                      <p className="text-xs text-muted-foreground">-8m vs last week</p>
+                      <p className="text-xs text-muted-foreground">-8m vs última semana</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -78,9 +78,9 @@ export default function DashboardPage() {
                   <Tabs defaultValue="overview" className="w-full">
                     <div className="flex justify-between items-center mb-4">
                       <TabsList className="bg-secondary/50 p-1">
-                        <TabsTrigger value="overview">Pipeline View</TabsTrigger>
-                        <TabsTrigger value="manual">Manual Breakdown</TabsTrigger>
-                        <TabsTrigger value="auto">Automation Stats</TabsTrigger>
+                        <TabsTrigger value="overview">Visão do Pipeline</TabsTrigger>
+                        <TabsTrigger value="manual">Detalhamento Manual</TabsTrigger>
+                        <TabsTrigger value="auto">Estatísticas de Automação</TabsTrigger>
                       </TabsList>
                     </div>
                     <TabsContent value="overview">
@@ -88,12 +88,12 @@ export default function DashboardPage() {
                     </TabsContent>
                     <TabsContent value="manual">
                       <div className="h-[400px] flex items-center justify-center border-2 border-dashed rounded-xl text-muted-foreground italic">
-                        Manual processing breakdown details loading...
+                        Carregando detalhes do processamento manual...
                       </div>
                     </TabsContent>
                     <TabsContent value="auto">
                       <div className="h-[400px] flex items-center justify-center border-2 border-dashed rounded-xl text-muted-foreground italic">
-                        Automation engine performance metrics loading...
+                        Carregando métricas de performance do motor de automação...
                       </div>
                     </TabsContent>
                   </Tabs>
@@ -104,8 +104,8 @@ export default function DashboardPage() {
             {activeTab === "intake" && (
               <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-1">
-                  <h2 className="text-3xl font-bold tracking-tight">AI Order Intake</h2>
-                  <p className="text-muted-foreground">Extract and validate order documents automatically.</p>
+                  <h2 className="text-3xl font-bold tracking-tight">Entrada de Pedidos IA</h2>
+                  <p className="text-muted-foreground">Extraia e valide documentos de pedido automaticamente.</p>
                 </div>
                 <OrderIntakeAI />
               </div>
@@ -114,8 +114,8 @@ export default function DashboardPage() {
             {activeTab === "delivery" && (
               <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-1">
-                  <h2 className="text-3xl font-bold tracking-tight">Delivery Occurrences AI</h2>
-                  <p className="text-muted-foreground">Get intelligent suggestions for logistics exceptions.</p>
+                  <h2 className="text-3xl font-bold tracking-tight">IA de Ocorrências de Entrega</h2>
+                  <p className="text-muted-foreground">Sugestões inteligentes para exceções logísticas.</p>
                 </div>
                 <DeliveryAssistant />
               </div>
@@ -127,8 +127,8 @@ export default function DashboardPage() {
                     <Box className="h-12 w-12 text-primary animate-pulse" />
                  </div>
                  <div>
-                   <h3 className="text-xl font-bold uppercase tracking-widest">{activeTab} section</h3>
-                   <p className="text-muted-foreground max-w-xs mx-auto">This module is under development to match the full vision of the dashboard.</p>
+                   <h3 className="text-xl font-bold uppercase tracking-widest">Seção de {activeTab === 'history' ? 'Histórico' : activeTab === 'settings' ? 'Configurações' : 'Suporte'}</h3>
+                   <p className="text-muted-foreground max-w-xs mx-auto">Este módulo está em desenvolvimento para completar a visão total do dashboard.</p>
                  </div>
               </div>
             )}

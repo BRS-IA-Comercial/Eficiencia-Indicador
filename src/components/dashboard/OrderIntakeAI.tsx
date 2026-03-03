@@ -48,10 +48,10 @@ export function OrderIntakeAI() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileUp className="h-5 w-5 text-primary" />
-            Process Order Document
+            Processar Documento de Pedido
           </CardTitle>
           <CardDescription>
-            Upload a PDF order intake document to automatically extract and categorize data using Vision Fluxo AI.
+            Faça upload de um PDF de pedido para extrair e categorizar dados automaticamente usando a IA Vision Fluxo.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center py-10">
@@ -60,8 +60,8 @@ export function OrderIntakeAI() {
               {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : <FileUp className="h-8 w-8" />}
             </div>
             <div className="text-center">
-              <p className="font-semibold text-lg">Click to select PDF</p>
-              <p className="text-sm text-muted-foreground">or drag and drop file here</p>
+              <p className="font-semibold text-lg">Clique para selecionar o PDF</p>
+              <p className="text-sm text-muted-foreground">ou arraste e solte o arquivo aqui</p>
             </div>
             <input 
               type="file" 
@@ -79,8 +79,8 @@ export function OrderIntakeAI() {
           <CardHeader className="bg-primary/5 border-b">
             <div className="flex justify-between items-start">
               <div>
-                <CardTitle className="text-xl">Extracted Order: #{result.orderId}</CardTitle>
-                <CardDescription>Order detected as <Badge variant="secondary" className="bg-accent/20 text-accent-foreground">{result.orderCategory}</Badge></CardDescription>
+                <CardTitle className="text-xl">Pedido Extraído: #{result.orderId}</CardTitle>
+                <CardDescription>Categoria detectada: <Badge variant="secondary" className="bg-accent/20 text-accent-foreground">{result.orderCategory}</Badge></CardDescription>
               </div>
               <CheckCircle2 className="text-primary h-6 w-6" />
             </div>
@@ -88,32 +88,32 @@ export function OrderIntakeAI() {
           <CardContent className="p-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <span className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><User className="h-3 w-3"/> Customer</span>
+                <span className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><User className="h-3 w-3"/> Cliente</span>
                 <p className="font-medium">{result.customerName}</p>
                 <p className="text-sm text-muted-foreground italic">{result.customerEmail}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><Calendar className="h-3 w-3"/> Order Date</span>
-                <p className="font-medium">{new Date(result.orderDate).toLocaleDateString()}</p>
+                <span className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><Calendar className="h-3 w-3"/> Data do Pedido</span>
+                <p className="font-medium">{new Date(result.orderDate).toLocaleDateString('pt-BR')}</p>
               </div>
             </div>
             
             <Separator />
             
             <div className="space-y-1">
-               <span className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><MapPin className="h-3 w-3"/> Shipping Address</span>
+               <span className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><MapPin className="h-3 w-3"/> Endereço de Entrega</span>
                <p className="text-sm leading-snug">{result.customerAddress}</p>
             </div>
 
             <Separator />
 
             <div className="space-y-3">
-              <span className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><ShoppingCart className="h-3 w-3"/> Line Items</span>
+              <span className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1"><ShoppingCart className="h-3 w-3"/> Itens do Pedido</span>
               <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
                 {result.items.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-center text-sm bg-muted/40 p-2 rounded">
                     <span>{item.quantity}x {item.productName}</span>
-                    <span className="font-mono">{result.currency} {(item.unitPrice * item.quantity).toFixed(2)}</span>
+                    <span className="font-mono">{result.currency} {(item.unitPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 ))}
               </div>
@@ -123,11 +123,11 @@ export function OrderIntakeAI() {
 
             <div className="flex justify-between items-center bg-primary text-primary-foreground p-4 rounded-xl shadow-inner">
               <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-bold opacity-80 flex items-center gap-1"><CreditCard className="h-3 w-3"/> Total Amount</span>
-                <p className="text-2xl font-bold">{result.currency} {result.totalAmount.toFixed(2)}</p>
+                <span className="text-[10px] uppercase font-bold opacity-80 flex items-center gap-1"><CreditCard className="h-3 w-3"/> Valor Total</span>
+                <p className="text-2xl font-bold">{result.currency} {result.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
               <Badge variant="outline" className="bg-white/10 text-white border-white/20">
-                {result.paymentStatus}
+                {result.paymentStatus === 'Paid' ? 'Pago' : result.paymentStatus === 'Pending' ? 'Pendente' : result.paymentStatus}
               </Badge>
             </div>
           </CardContent>
@@ -136,7 +136,7 @@ export function OrderIntakeAI() {
         <Card className="flex items-center justify-center border-none bg-transparent">
           <div className="text-center space-y-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-            <p className="text-muted-foreground animate-pulse">Vision AI is scanning the document...</p>
+            <p className="text-muted-foreground animate-pulse">A IA Vision está digitalizando o documento...</p>
           </div>
         </Card>
       ) : error ? (
@@ -149,7 +149,7 @@ export function OrderIntakeAI() {
         </Card>
       ) : (
         <div className="flex items-center justify-center p-12 text-muted-foreground italic text-center border-2 border-dashed border-muted rounded-xl">
-           Results will appear here once processed.
+           Os resultados aparecerão aqui após o processamento.
         </div>
       )}
     </div>

@@ -1,10 +1,11 @@
+
 'use server';
 /**
- * @fileOverview This file implements an AI flow for extracting and categorizing order data from PDF documents.
+ * @fileOverview Este arquivo implementa um fluxo de IA para extrair e categorizar dados de pedidos de documentos PDF.
  *
- * - extractOrderData - A function that handles the extraction of order data.
- * - OrderDataExtractorInput - The input type for the extractOrderData function.
- * - OrderDataExtractorOutput - The return type for the extractOrderData function.
+ * - extractOrderData - Uma função que gerencia o processo de extração de dados de pedidos.
+ * - OrderDataExtractorInput - O tipo de entrada para a função extractOrderData.
+ * - OrderDataExtractorOutput - O tipo de retorno para a função extractOrderData.
  */
 
 import { ai } from '@/ai/genkit';
@@ -14,28 +15,28 @@ const OrderDataExtractorInputSchema = z.object({
   pdfDataUri: z
     .string()
     .describe(
-      "A PDF document content, provided as a data URI that must include a MIME type (e.g., 'application/pdf') and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+      "O conteúdo de um documento PDF, fornecido como uma data URI que deve incluir o tipo MIME (ex: 'application/pdf') e usar codificação Base64. Formato esperado: 'data:<mimetype>;base64,<encoded_data>'."
     ),
 });
 export type OrderDataExtractorInput = z.infer<typeof OrderDataExtractorInputSchema>;
 
 const OrderLineItemSchema = z.object({
-  productName: z.string().describe('The name of the ordered product.'),
-  quantity: z.number().int().positive().describe('The quantity of the product ordered.'),
-  unitPrice: z.number().positive().describe('The unit price of the product.'),
+  productName: z.string().describe('O nome do produto pedido.'),
+  quantity: z.number().int().positive().describe('A quantidade do produto pedido.'),
+  unitPrice: z.number().positive().describe('O preço unitário do produto.'),
 });
 
 const OrderDataExtractorOutputSchema = z.object({
-  orderId: z.string().describe('The unique identifier for the order.'),
-  customerName: z.string().describe('The full name of the customer.'),
-  customerEmail: z.string().email().optional().describe('The email address of the customer.'),
-  customerAddress: z.string().describe('The shipping or billing address of the customer.'),
-  orderDate: z.string().datetime().describe('The date the order was placed (ISO 8601 format).'),
-  items: z.array(OrderLineItemSchema).describe('A list of items included in the order.'),
-  totalAmount: z.number().positive().describe('The total monetary amount of the order.'),
-  currency: z.string().length(3).describe('The currency of the total amount (e.g., "USD", "BRL").'),
-  orderCategory: z.enum(['Retail', 'Wholesale', 'Service', 'Digital', 'Physical Product', 'Other']).describe('A category describing the nature of the order.'),
-  paymentStatus: z.enum(['Paid', 'Pending', 'Failed', 'Refunded']).describe('The payment status of the order.'),
+  orderId: z.string().describe('O identificador único para o pedido.'),
+  customerName: z.string().describe('O nome completo do cliente.'),
+  customerEmail: z.string().email().optional().describe('O endereço de e-mail do cliente.'),
+  customerAddress: z.string().describe('O endereço de entrega ou cobrança do cliente.'),
+  orderDate: z.string().datetime().describe('A data em que o pedido foi feito (formato ISO 8601).'),
+  items: z.array(OrderLineItemSchema).describe('Uma lista de itens incluídos no pedido.'),
+  totalAmount: z.number().positive().describe('O valor monetário total do pedido.'),
+  currency: z.string().length(3).describe('A moeda do valor total (ex: "BRL", "USD").'),
+  orderCategory: z.enum(['Varejo', 'Atacado', 'Serviço', 'Digital', 'Produto Físico', 'Outro']).describe('Uma categoria que descreve a natureza do pedido.'),
+  paymentStatus: z.enum(['Paid', 'Pending', 'Failed', 'Refunded']).describe('O status de pagamento do pedido.'),
 });
 export type OrderDataExtractorOutput = z.infer<typeof OrderDataExtractorOutputSchema>;
 
@@ -49,13 +50,14 @@ const prompt = ai.definePrompt({
   name: 'orderDataExtractorPrompt',
   input: { schema: OrderDataExtractorInputSchema },
   output: { schema: OrderDataExtractorOutputSchema },
-  prompt: `You are an expert in extracting structured order data from various document types.
-Your task is to accurately extract all specified fields from the provided order intake document.
-If a field is not found, use a reasonable default or infer if possible, but prioritize explicit information.
-The document is provided as a Base64 encoded PDF data URI, which you should interpret as an image for data extraction.
-Categorize the order based on its contents into one of the following: 'Retail', 'Wholesale', 'Service', 'Digital', 'Physical Product', 'Other'.
+  prompt: `Você é um especialista em extração de dados estruturados de pedidos a partir de diversos tipos de documentos.
+Sua tarefa é extrair com precisão todos os campos especificados do documento de entrada de pedido fornecido.
+Se um campo não for encontrado, use um padrão razoável ou infira se possível, mas priorize a informação explícita.
+O documento é fornecido como uma data URI de PDF codificada em Base64, que você deve interpretar como uma imagem para extração de dados.
+Categorize o pedido com base em seu conteúdo em uma das seguintes categorias: 'Varejo', 'Atacado', 'Serviço', 'Digital', 'Produto Físico', 'Outro'.
+Responda sempre em Português do Brasil para nomes de produtos e categorias.
 
-Order Document: {{media url=pdfDataUri}}
+Documento do Pedido: {{media url=pdfDataUri}}
 `,
 });
 

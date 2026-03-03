@@ -6,15 +6,15 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupConte
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
-  { icon: FileText, label: "Order Intake (AI)", id: "intake" },
-  { icon: Truck, label: "Delivery Occurrences", id: "delivery" },
-  { icon: History, label: "History", id: "history" },
+  { icon: LayoutDashboard, label: "Painel de Controle", id: "dashboard" },
+  { icon: FileText, label: "Entrada IA", id: "intake" },
+  { icon: Truck, label: "Ocorrências", id: "delivery" },
+  { icon: History, label: "Histórico", id: "history" },
 ];
 
 const secondaryItems = [
-  { icon: Settings, label: "Settings", id: "settings" },
-  { icon: HelpCircle, label: "Support", id: "support" },
+  { icon: Settings, label: "Configurações", id: "settings" },
+  { icon: HelpCircle, label: "Suporte", id: "support" },
 ];
 
 export function SidebarNav({ activeTab, onTabChange }: { activeTab: string, onTabChange: (id: string) => void }) {
@@ -30,7 +30,7 @@ export function SidebarNav({ activeTab, onTabChange }: { activeTab: string, onTa
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Main Process</SidebarGroupLabel>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Processo Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
@@ -52,7 +52,7 @@ export function SidebarNav({ activeTab, onTabChange }: { activeTab: string, onTa
         <SidebarSeparator />
         
         <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">System</SidebarGroupLabel>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Sistema</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {secondaryItems.map((item) => (
@@ -74,14 +74,14 @@ export function SidebarNav({ activeTab, onTabChange }: { activeTab: string, onTa
       <SidebarFooter className="p-4">
         <div className="flex items-center gap-3 bg-secondary/50 rounded-xl p-3 group-data-[collapsible=icon]:p-1 group-data-[collapsible=icon]:bg-transparent">
           <Avatar className="h-9 w-9 border-2 border-primary/20 shrink-0">
-            <AvatarImage src="https://picsum.photos/seed/user-vision/200/200" alt="Admin User" />
-            <AvatarFallback>AD</AvatarFallback>
+            <AvatarImage src="https://picsum.photos/seed/user-vision/200/200" alt="Usuário Administrador" />
+            <AvatarFallback>GF</AvatarFallback>
           </Avatar>
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-semibold truncate">Gestor de Fluxo</span>
             <span className="text-xs text-muted-foreground truncate">gestor@fluxo.com</span>
           </div>
-          <SidebarMenuButton className="ml-auto w-8 h-8 group-data-[collapsible=icon]:hidden" tooltip="Logout">
+          <SidebarMenuButton className="ml-auto w-8 h-8 group-data-[collapsible=icon]:hidden" tooltip="Sair">
             <LogOut className="h-4 w-4" />
           </SidebarMenuButton>
         </div>
