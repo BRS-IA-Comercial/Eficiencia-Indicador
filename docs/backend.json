@@ -1,0 +1,38 @@
+
+{
+  "entities": {
+    "ErpMapping": {
+      "title": "Mapeamento ERP",
+      "description": "Mapeia um conglomerado para um ou mais códigos ERP mãe.",
+      "type": "object",
+      "properties": {
+        "conglomerado": {
+          "type": "string",
+          "description": "Nome do conglomerado (Coluna C)"
+        },
+        "erpMaeCodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Lista de códigos ERP mãe (Coluna E)"
+        },
+        "importedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Data e hora da importação"
+        }
+      },
+      "required": ["conglomerado", "erpMaeCodes", "importedAt"]
+    }
+  },
+  "auth": {
+    "providers": ["google.com"]
+  },
+  "firestore": {
+    "/erp_mappings/{mappingId}": {
+      "schema": "ErpMapping",
+      "description": "Coleção de mapeamentos de ERP importados via Excel."
+    }
+  }
+}
