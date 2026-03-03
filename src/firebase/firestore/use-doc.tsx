@@ -28,7 +28,7 @@ export function useDoc<T = DocumentData>(docRef: DocumentReference<T> | null) {
         setLoading(false);
       },
       (err) => {
-        console.error(err);
+        console.error('Erro no documento:', err);
         setError(err);
         setLoading(false);
       }

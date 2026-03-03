@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "ErpMapping": {
@@ -24,6 +23,15 @@
         }
       },
       "required": ["conglomerado", "erpMaeCodes", "importedAt"]
+    },
+    "AppStats": {
+      "title": "Estatísticas do App",
+      "description": "Armazena dados globais do dashboard.",
+      "type": "object",
+      "properties": {
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "totalOrders": { "type": "number" }
+      }
     }
   },
   "auth": {
@@ -33,6 +41,10 @@
     "/erp_mappings/{mappingId}": {
       "schema": "ErpMapping",
       "description": "Coleção de mapeamentos de ERP importados via Excel."
+    },
+    "/stats/global": {
+      "schema": "AppStats",
+      "description": "Estatísticas globais do sistema."
     }
   }
 }

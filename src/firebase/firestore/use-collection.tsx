@@ -32,7 +32,7 @@ export function useCollection<T = DocumentData>(query: Query<T> | null) {
         setLoading(false);
       },
       (err) => {
-        console.error(err);
+        console.error('Erro na coleção:', err);
         setError(err);
         setLoading(false);
       }
