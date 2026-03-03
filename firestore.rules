@@ -1,0 +1,15 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Permite leitura e escrita na coleção erp_mappings para desenvolvimento
+    match /erp_mappings/{mappingId} {
+      allow read, write: if true;
+    }
+    
+    // Regra padrão: bloqueia tudo o que não foi explicitamente permitido
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
