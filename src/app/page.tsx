@@ -1,6 +1,7 @@
 
 "use client";
 
+import { Fragment } from "react";
 import { Brain } from "lucide-react";
 
 export default function OrderFulfillmentDashboard() {
@@ -39,14 +40,14 @@ export default function OrderFulfillmentDashboard() {
         <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
           <div className="bg-white dark:bg-card border-r border-b border-border"></div>
           {Array.from({ length: 6 }).map((_, i) => (
-            <>
+            <Fragment key={`sub-header-${i}`}>
               <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-gray-400">
                 Forma
               </div>
               <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-white">
                 %
               </div>
-            </>
+            </Fragment>
           ))}
         </div>
 
@@ -76,7 +77,7 @@ export default function OrderFulfillmentDashboard() {
             { label: "Agente Rupturas", value: "1,9%" },
             { label: "Agente Atendimento IA", value: "0,0%", icon: true },
           ].map((item, idx) => (
-            <div key={idx} className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700 last:border-r-0">
+            <div key={`auto-${idx}`} className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700 last:border-r-0">
               <span className="text-[10px] mb-1 flex items-center flex-col text-center leading-tight">
                 {item.icon && <Brain className="h-3 w-3 mb-0.5" />}
                 {item.label}
@@ -106,7 +107,7 @@ export default function OrderFulfillmentDashboard() {
 
           {/* Outras colunas manuais */}
           {["4,7%", "71,5%", "64,7%", "98,1%", "100,0%"].map((val, idx) => (
-            <div key={idx} className="col-span-2 bg-neutral text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700 last:border-r-0">
+            <div key={`manual-${idx}`} className="col-span-2 bg-neutral text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700 last:border-r-0">
               <span className="text-[10px] mb-1">Manual</span>
               <span className="text-2xl font-bold">{val}</span>
             </div>
@@ -126,14 +127,14 @@ export default function OrderFulfillmentDashboard() {
             { n: 3080, p: "44,7%" },
             { n: 2345, p: "34,0%" },
           ].map((item, idx) => (
-            <>
-              <div key={`n-${idx}`} className="col-span-1 bg-gray-500 text-white flex items-center justify-center font-bold border-r border-b border-white/40">
+            <Fragment key={`weight-${idx}`}>
+              <div className="col-span-1 bg-gray-500 text-white flex items-center justify-center font-bold border-r border-b border-white/40">
                 {item.n}
               </div>
-              <div key={`p-${idx}`} className="col-span-1 bg-gray-500 text-white flex items-center justify-center font-bold text-lg border-r border-b border-white/40 last:border-r-0">
+              <div className="col-span-1 bg-gray-500 text-white flex items-center justify-center font-bold text-lg border-r border-b border-white/40 last:border-r-0">
                 {item.p}
               </div>
-            </>
+            </Fragment>
           ))}
         </div>
 
@@ -141,7 +142,7 @@ export default function OrderFulfillmentDashboard() {
         <div className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm font-bold text-xl text-black">
           <div className="bg-white dark:bg-card border-r border-b border-border"></div>
           {["84,4%", "95,3%", "28,5%", "35,3%", "1,9%", "0,0%"].map((val, idx) => (
-            <div key={idx} className="bg-[#00FF40] text-center py-2 border-r border-b border-white dark:border-gray-700 last:border-r-0">
+            <div key={`total-${idx}`} className="bg-[#00FF40] text-center py-2 border-r border-b border-white dark:border-gray-700 last:border-r-0">
               {val}
             </div>
           ))}
@@ -157,7 +158,7 @@ export default function OrderFulfillmentDashboard() {
         <div className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm bg-gray-600 text-white font-bold text-xs">
           <div className="border-r border-b border-gray-500"></div>
           {["84,4%", "95,3%", "28,5%", "35,3%", "1,9%", "0,0%"].map((val, idx) => (
-            <div key={idx} className="text-center py-1 border-r border-b border-gray-500 last:border-r-0">
+            <div key={`mgr-total-${idx}`} className="text-center py-1 border-r border-b border-gray-500 last:border-r-0">
               {val}
             </div>
           ))}
@@ -173,7 +174,7 @@ export default function OrderFulfillmentDashboard() {
           { name: "Giovane Scherer", values: ["79%", "91%", "34%", "44%", "0%", "0%"] },
           { name: "Mauricio de Mello Gonçalves", values: ["81%", "97%", "60%", "47%", "0%", "0%"] },
         ].map((manager, idx) => (
-          <div key={idx} className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm border-b border-border hover:bg-muted/50 transition-colors">
+          <div key={`manager-${idx}`} className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm border-b border-border hover:bg-muted/50 transition-colors">
             <div className="bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 font-medium px-3 py-1 flex items-center text-xs border-r border-white dark:border-gray-700">
               {manager.name}
             </div>
@@ -183,7 +184,7 @@ export default function OrderFulfillmentDashboard() {
                 bgColor = val === "81%" ? "bg-amber-400" : "bg-secondary";
               }
               return (
-                <div key={vIdx} className={`${bgColor} text-white text-center py-1 font-bold border-r border-white dark:border-gray-700 flex items-center justify-center relative last:border-r-0`}>
+                <div key={`val-${idx}-${vIdx}`} className={`${bgColor} text-white text-center py-1 font-bold border-r border-white dark:border-gray-700 flex items-center justify-center relative last:border-r-0`}>
                   {vIdx === 2 && <div className="w-2 h-2 bg-green-700 transform rotate-45 absolute left-1 top-1"></div>}
                   {val}
                 </div>
