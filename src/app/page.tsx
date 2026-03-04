@@ -69,10 +69,12 @@ export default function OrderFulfillmentDashboard() {
     const executives: Record<string, any> = {};
     const conglomerateToErp: Record<string, string[]> = {};
     
+    // Mapeia os dados do Excel (Conglomerado -> Lista de ERPs)
     erpMappings.forEach((m: any) => {
       conglomerateToErp[m.conglomerado] = m.erpMaeCodes;
     });
 
+    // Agrupa dados do Cubo (Executivo -> Conglomerado)
     cuboMetrics.forEach((m: any) => {
       const execName = m.executivo || "Não Definido";
       const congName = m.conglomerado || m.cliente || "Não Mapeado";
@@ -139,6 +141,7 @@ export default function OrderFulfillmentDashboard() {
             importedAt: serverTimestamp()
           };
 
+          // Usamos o NOME do conglomerado como ID fixo para evitar duplicatas
           const mappingRef = doc(db, "erp_mappings", conglomerado);
           
           setDoc(mappingRef, payload, { merge: true }).catch(async () => {
@@ -153,7 +156,7 @@ export default function OrderFulfillmentDashboard() {
         }
       }
 
-      toast({ title: "Sucesso!", description: `${count} registros processados (IDs atualizados).` });
+      toast({ title: "Sucesso!", description: `${count} conglomerados atualizados no mapeamento.` });
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (error) {

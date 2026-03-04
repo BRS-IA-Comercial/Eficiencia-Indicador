@@ -1,12 +1,12 @@
 
 import { NextResponse } from 'next/server';
 import { initializeFirebase } from '@/firebase';
-import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 /**
  * Endpoint de Sincronização para Scripts PowerShell.
  * Recebe o payload do Cubo SQL e atualiza no Firestore.
- * Utiliza o nome do cliente como ID para evitar duplicidade.
+ * Prioriza o uso de IDs únicos (Código do Cliente) para evitar duplicidade.
  */
 export async function POST(request: Request) {
   const { firestore } = initializeFirebase();
@@ -24,15 +24,18 @@ export async function POST(request: Request) {
     
     let count = 0;
     for (const item of metrics) {
-      const clientName = String(item.cliente || "Desconhecido").trim();
+      // Usamos o CdExtCliente (ou cliente se o código não for enviado) como ID estável
+      // Recomendação: No PowerShell, adicione o CdExtCliente ao objeto enviado.
+      const uniqueId = String(item.cdExtCliente || item.cliente || "Desconhecido").trim();
       
-      // Criamos um ID fixo baseado no nome do cliente
-      const metricRef = doc(firestore, 'cubo_metrics', clientName);
+      if (uniqueId === "Desconhecido") continue;
+
+      const metricRef = doc(firestore, 'cubo_metrics', uniqueId);
       
       await setDoc(metricRef, {
         executivo: item.nome || 'Não Informado',
-        cliente: clientName,
-        conglomerado: item.conglomerado || clientName,
+        cliente: item.cliente || 'Sem Nome',
+        conglomerado: item.conglomerado || item.cliente || 'Não Mapeado',
         mes: item.month || '',
         qtdIA: item.totalOrders || item.orders || 0,
         qtdTotal: item.ordersOp || 0,
@@ -44,18 +47,17 @@ export async function POST(request: Request) {
         fase: item.fase || '',
         dataImpl: item.implDate || '',
         updatedAt: serverTimestamp()
-      }, { merge: true }); // Merge: true garante que só os novos campos sejam alterados
+      }, { merge: true }); // Merge garante que mudanças de executivo apenas atualizem o campo
       
       count++;
     }
 
     return NextResponse.json({ 
       success: true, 
-      message: `${count} clientes atualizados/sincronizados.`,
+      message: `${count} registros sincronizados/atualizados com sucesso.`,
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
-    console.error('API Sync Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
