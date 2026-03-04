@@ -24,7 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useFirestore, useCollection, useFirebaseApp } from "@/firebase";
-import { collection, addDoc, serverTimestamp, query, orderBy } from "firebase/firestore";
+import { collection, doc, setDoc, serverTimestamp, query, orderBy } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
@@ -63,19 +63,16 @@ export default function OrderFulfillmentDashboard() {
   const { data: erpMappings, loading: isLoadingMappings } = useCollection(erpMappingsQuery);
   const { data: cuboMetrics, loading: isLoadingMetrics } = useCollection(cuboMetricsQuery);
 
-  // Agrupa dados para a hierarquia: Executivo -> Conglomerado -> ERP
   const groupedData = useMemo(() => {
     if (!cuboMetrics || !erpMappings) return [];
 
     const executives: Record<string, any> = {};
-
-    // 1. Mapeia Conglomerados para seus ERPs (vindo do Excel)
     const conglomerateToErp: Record<string, string[]> = {};
+    
     erpMappings.forEach((m: any) => {
       conglomerateToErp[m.conglomerado] = m.erpMaeCodes;
     });
 
-    // 2. Mapeia Executivos para seus Conglomerados (vindo do Cubo SQL)
     cuboMetrics.forEach((m: any) => {
       const execName = m.executivo || "Não Definido";
       const congName = m.conglomerado || m.cliente || "Não Mapeado";
@@ -127,26 +124,27 @@ export default function OrderFulfillmentDashboard() {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
       
-      const erpMappingsRef = collection(db, "erp_mappings");
       let count = 0;
 
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        const conglomerado = row[2];
+        const conglomerado = String(row[2] || "").trim();
         const erpMaeRaw = row[4];
 
         if (conglomerado && erpMaeRaw) {
           const erpCodes = String(erpMaeRaw).split(",").map(c => c.trim()).filter(c => c !== "");
           const payload = {
-            conglomerado: String(conglomerado),
+            conglomerado: conglomerado,
             erpMaeCodes: erpCodes,
             importedAt: serverTimestamp()
           };
 
-          addDoc(erpMappingsRef, payload).catch(async () => {
+          const mappingRef = doc(db, "erp_mappings", conglomerado);
+          
+          setDoc(mappingRef, payload, { merge: true }).catch(async () => {
             const permissionError = new FirestorePermissionError({
-              path: erpMappingsRef.path,
-              operation: 'create',
+              path: mappingRef.path,
+              operation: 'write',
               requestResourceData: payload,
             } satisfies SecurityRuleContext);
             errorEmitter.emit('permission-error', permissionError);
@@ -155,7 +153,7 @@ export default function OrderFulfillmentDashboard() {
         }
       }
 
-      toast({ title: "Sucesso!", description: `${count} registros importados do Excel.` });
+      toast({ title: "Sucesso!", description: `${count} registros processados (IDs atualizados).` });
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (error) {
@@ -192,7 +190,6 @@ export default function OrderFulfillmentDashboard() {
                 Acompanhamento Operacional por Executivo
               </header>
 
-              {/* Cabeçalho de Processos */}
               <div className="grid grid-cols-[300px_repeat(6,_1fr)] text-sm border-b">
                 <div className="bg-white dark:bg-surface-dark p-3 font-bold text-muted-foreground uppercase text-xxs tracking-widest flex items-center gap-2">
                   <User className="h-3 w-3" /> Hierarquia de Atendimento
@@ -230,7 +227,6 @@ export default function OrderFulfillmentDashboard() {
                   const isExecExpanded = !!expandedItems[exec.name];
                   return (
                     <div key={exec.name} className="flex flex-col">
-                      {/* Nível 1: Executivo */}
                       <div 
                         className="flex items-center justify-between p-4 bg-gray-100/50 dark:bg-gray-900/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-900 border-l-4 border-primary transition-all"
                         onClick={() => toggleItem(exec.name)}
@@ -240,9 +236,6 @@ export default function OrderFulfillmentDashboard() {
                           <span className="font-black text-base text-gray-800 dark:text-gray-100 uppercase tracking-tight">
                             {exec.name}
                           </span>
-                          <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">
-                            {exec.conglomerates.length} Conglomerados
-                          </Badge>
                         </div>
                         {isExecExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                       </div>
@@ -254,7 +247,6 @@ export default function OrderFulfillmentDashboard() {
                             const isCongExpanded = !!expandedItems[congId];
                             return (
                               <div key={congId} className="flex flex-col ml-4 border-l-2 border-gray-200 dark:border-gray-700">
-                                {/* Nível 2: Conglomerado */}
                                 <div 
                                   className="flex items-center justify-between p-3 bg-white dark:bg-surface-dark cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
                                   onClick={() => toggleItem(congId)}
@@ -264,16 +256,12 @@ export default function OrderFulfillmentDashboard() {
                                     <span className="font-bold text-sm text-gray-700 dark:text-gray-300 uppercase">
                                       {cong.name}
                                     </span>
-                                    <Badge variant="outline" className="text-[9px] h-4">
-                                      {cong.erps.length} ERPs
-                                    </Badge>
                                   </div>
                                   {isCongExpanded ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                                 </div>
 
                                 {isCongExpanded && (
                                   <div className="animate-in slide-in-from-top-1 duration-150">
-                                    {/* Nível 3: ERPs por linha */}
                                     {cong.erps.length > 0 ? (
                                       cong.erps.map((code: string, i: number) => (
                                         <div key={i} className="grid grid-cols-[300px_repeat(6,_1fr)] border-t border-gray-100 dark:border-gray-800 hover:bg-primary/5 group transition-colors">
@@ -284,7 +272,6 @@ export default function OrderFulfillmentDashboard() {
                                               <span className="text-xs font-bold text-primary">{code}</span>
                                             </div>
                                           </div>
-                                          
                                           {[1, 2, 3, 4, 5, 6].map((step) => (
                                             <div key={step} className="p-3 flex items-center justify-center border-r last:border-r-0">
                                               <div className="flex flex-col items-center">
@@ -299,7 +286,7 @@ export default function OrderFulfillmentDashboard() {
                                       ))
                                     ) : (
                                       <div className="p-3 pl-12 text-[10px] text-muted-foreground italic bg-yellow-50/30">
-                                        Nenhum ERP mapeado no Excel para este conglomerado.
+                                        Nenhum ERP mapeado para este conglomerado.
                                       </div>
                                     )}
                                   </div>
@@ -336,7 +323,7 @@ export default function OrderFulfillmentDashboard() {
                         <div className="flex gap-2 mt-4">
                            <Button onClick={() => setSelectedFile(null)} variant="outline" size="sm">Limpar</Button>
                            <Button onClick={handleImport} disabled={isImporting} size="sm">
-                            {isImporting ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />} Confirmar Excel
+                            {isImporting ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />} Confirmar Importação
                           </Button>
                         </div>
                       </div>
@@ -360,7 +347,7 @@ export default function OrderFulfillmentDashboard() {
                 <CardContent className="p-6 space-y-4">
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
                     <h4 className="font-bold mb-2">Instruções para o Servidor</h4>
-                    <p className="text-xs mb-3">O script PowerShell deve enviar um JSON com o campo <code className="bg-blue-100 px-1 font-bold">nome</code> para Executivo e <code className="bg-blue-100 px-1 font-bold">conglomerado</code>.</p>
+                    <p className="text-xs mb-3">O script envia dados vinculados ao Cliente. Se o Executivo mudar no SQL, o Dashboard atualizará automaticamente.</p>
                     <code className="block bg-gray-900 text-green-400 p-3 rounded text-xxs mb-4 select-all">
                       POST https://{host || '...'}/api/sync
                     </code>
