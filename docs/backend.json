@@ -23,6 +23,26 @@
         }
       },
       "required": ["conglomerado", "erpMaeCodes", "importedAt"]
+    },
+    "CuboMetric": {
+      "title": "Métrica de Produtividade (Cubo)",
+      "description": "Dados de produtividade e ganhos financeiros extraídos dos cubos SQL.",
+      "type": "object",
+      "properties": {
+        "executivo": { "type": "string" },
+        "cliente": { "type": "string" },
+        "mes": { "type": "string" },
+        "qtdIA": { "type": "number" },
+        "qtdTotal": { "type": "number" },
+        "hoursSaved": { "type": "number" },
+        "fte": { "type": "number" },
+        "financialGain": { "type": "number" },
+        "grupo": { "type": "string" },
+        "origem": { "type": "string" },
+        "fase": { "type": "string" },
+        "dataImpl": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -32,6 +52,10 @@
     "/erp_mappings/{mappingId}": {
       "schema": "ErpMapping",
       "description": "Coleção de mapeamentos de ERP importados via Excel."
+    },
+    "/cubo_metrics/{metricId}": {
+      "schema": "CuboMetric",
+      "description": "Métricas de ROI e produtividade sincronizadas dos cubos internos."
     }
   }
 }

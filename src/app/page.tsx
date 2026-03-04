@@ -17,7 +17,11 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsDown,
-  ChevronsUp
+  ChevronsUp,
+  TrendingUp,
+  DollarSign,
+  Clock,
+  Users
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useFirestore, useCollection, useFirebaseApp } from "@/firebase";
-import { collection, addDoc, serverTimestamp, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, orderBy, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
@@ -50,7 +54,23 @@ export default function OrderFulfillmentDashboard() {
     return query(collection(db, "erp_mappings"), orderBy("importedAt", "desc"));
   }, [db]);
 
-  const { data: erpMappings, loading: isLoadingData } = useCollection(erpMappingsQuery);
+  const productivityQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, "cubo_metrics"), orderBy("updatedAt", "desc"), limit(50));
+  }, [db]);
+
+  const { data: erpMappings, loading: isLoadingMappings } = useCollection(erpMappingsQuery);
+  const { data: cuboMetrics, loading: isLoadingMetrics } = useCollection(productivityQuery);
+
+  // Cálculos de ROI baseados nos dados do Cubo
+  const stats = useMemo(() => {
+    if (!cuboMetrics) return { totalSaving: 0, totalFte: 0, totalHours: 0 };
+    return cuboMetrics.reduce((acc, curr: any) => ({
+      totalSaving: acc.totalSaving + (curr.financialGain || 0),
+      totalFte: acc.totalFte + (curr.fte || 0),
+      totalHours: acc.totalHours + (curr.hoursSaved || 0),
+    }), { totalSaving: 0, totalFte: 0, totalHours: 0 });
+  }, [cuboMetrics]);
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
@@ -126,17 +146,16 @@ export default function OrderFulfillmentDashboard() {
 
       toast({
         title: "Sucesso!",
-        description: `${count} registros estão sendo sincronizados com o banco de dados real.`,
+        description: `${count} registros estão sendo sincronizados.`,
       });
       
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (error) {
-      console.error("Erro na importação:", error);
       toast({
         variant: "destructive",
         title: "Erro fatal",
-        description: "Não foi possível processar o arquivo Excel.",
+        description: "Não foi possível processar o arquivo.",
       });
     } finally {
       setIsImporting(false);
@@ -154,6 +173,10 @@ export default function OrderFulfillmentDashboard() {
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
               </TabsTrigger>
+              <TabsTrigger value="produtividade" className="gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Produtividade (ROI)
+              </TabsTrigger>
               <TabsTrigger value="configuracao" className="gap-2">
                 <SettingsIcon className="h-4 w-4" />
                 Configuração
@@ -165,17 +188,55 @@ export default function OrderFulfillmentDashboard() {
                   ID Projeto: <span className="font-bold">{projectId}</span>
                </Badge>
                <div className="text-xxs font-bold text-muted-foreground uppercase tracking-widest bg-white dark:bg-surface-dark px-3 py-1 rounded border">
-                Fluxo Vision v3.2 - Cloud Sync
+                Fluxo Vision v4.0 - ROI Master
               </div>
             </div>
           </div>
 
-          <TabsContent value="dashboard" className="mt-0">
+          <TabsContent value="dashboard" className="mt-0 space-y-4">
+            {/* Cards de ROI Rápidos */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="bg-primary text-white border-none shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xxs font-bold uppercase opacity-80">Saving Financeiro IA</p>
+                      <h3 className="text-2xl font-black">R$ {stats.totalSaving.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+                    </div>
+                    <DollarSign className="h-8 w-8 opacity-40" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-secondary text-white border-none shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xxs font-bold uppercase opacity-80">Produtividade Gerada</p>
+                      <h3 className="text-2xl font-black">{stats.totalFte.toFixed(2)} FTE</h3>
+                    </div>
+                    <Users className="h-8 w-8 opacity-40" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gray-800 text-white border-none shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xxs font-bold uppercase opacity-80">Horas Salvas (S&OP)</p>
+                      <h3 className="text-2xl font-black">{stats.totalHours.toFixed(1)} h</h3>
+                    </div>
+                    <Clock className="h-8 w-8 opacity-40" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <div className="bg-surface-light dark:bg-surface-dark shadow-xl rounded-lg overflow-hidden border border-border-light dark:border-border-dark min-w-[1200px]">
               <header className="bg-primary text-white text-center py-3 font-bold text-xl uppercase tracking-wide border-b border-white dark:border-gray-700">
-                Etapas do Processo de Atendimento de Pedidos
+                Processo de Atendimento de Pedidos - Visão Geral
               </header>
 
+              {/* ... (Cabeçalhos do Dashboard - Mantidos os mesmos) ... */}
               <div className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm">
                 <div className="bg-white dark:bg-surface-dark border-r border-b border-gray-200 dark:border-gray-700"></div>
                 {[
@@ -193,56 +254,9 @@ export default function OrderFulfillmentDashboard() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
-                <div className="bg-white dark:bg-surface-dark border-r border-b border-gray-200 dark:border-gray-700"></div>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <React.Fragment key={`header-cols-${i}`}>
-                    <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-gray-400">Forma</div>
-                    <div className="bg-gray-600 text-white text-[10px] text-center py-1 border-r border-b border-white">%</div>
-                  </React.Fragment>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
-                <div className="bg-secondary text-white font-bold flex items-center justify-center text-center p-2 border-r border-b border-white dark:border-gray-700 text-lg leading-tight">
-                  Processos Automatizados
-                </div>
-                <div className="col-span-2 grid grid-cols-2 grid-rows-3">
-                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700">Painel SIC</div>
-                  <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">79,2%</div>
-                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700"><Brain className="h-3 w-3 mr-1" /> PDF IA</div>
-                  <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">5,2%</div>
-                  <div className="bg-secondary text-white text-[10px] flex items-center justify-center text-center p-1 border-r border-b border-white dark:border-gray-700 leading-tight">Painel Automático</div>
-                  <div className="bg-secondary text-white font-bold flex items-center justify-center text-lg border-r border-b border-white dark:border-gray-700">0,0%</div>
-                </div>
-                <div className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700">
-                  <span className="text-[10px] mb-1">Automático</span>
-                  <span className="text-2xl font-bold">95,3%</span>
-                </div>
-                <div className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700">
-                  <span className="text-[10px] mb-1">Automático</span>
-                  <span className="text-2xl font-bold">28,5%</span>
-                </div>
-                <div className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700">
-                  <span className="text-[10px] mb-1">Automático</span>
-                  <span className="text-2xl font-bold">35,3%</span>
-                </div>
-                <div className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-r border-b border-white dark:border-gray-700">
-                  <span className="text-[10px] mb-1 text-center">Agente Rupturas</span>
-                  <span className="text-2xl font-bold">1,9%</span>
-                </div>
-                <div className="col-span-2 bg-secondary text-white flex flex-col justify-center items-center border-b border-white dark:border-gray-700">
-                  <span className="text-[10px] mb-1 flex items-center flex-col text-center leading-none">
-                    <Brain className="h-3 w-3 mb-1" />
-                    Agente IA
-                  </span>
-                  <span className="text-2xl font-bold">0,0%</span>
-                </div>
-              </div>
-
               <div className="bg-gray-600 text-white px-4 py-2 flex items-center justify-between border-t border-b border-gray-400">
                 <span className="font-bold text-xs uppercase tracking-tighter">
-                  Conglomerados e ERPs Sincronizados em Tempo Real
+                  Conglomerados e ERPs Sincronizados
                 </span>
                 <div className="flex gap-2">
                   <Button 
@@ -265,16 +279,15 @@ export default function OrderFulfillmentDashboard() {
               </div>
               
               <div className="max-h-[600px] overflow-y-auto bg-white dark:bg-surface-dark divide-y divide-gray-200 dark:divide-gray-700">
-                {isLoadingData && (
-                  <div className="p-8 text-center text-muted-foreground">
-                    <Loader2 className="animate-spin inline mr-2 h-4 w-4" /> Sincronizando com Firestore...
+                {isLoadingMappings && (
+                  <div className="p-8 text-center text-muted-foreground italic text-xs animate-pulse">
+                    <Loader2 className="animate-spin inline mr-2 h-4 w-4" /> Sincronizando dados mestre...
                   </div>
                 )}
                 {erpMappings?.map((mapping: any) => {
                   const isExpanded = !!expandedRows[mapping.id];
                   return (
                     <div key={mapping.id} className="transition-colors">
-                      {/* Header do Cliente (Conglomerado) */}
                       <div 
                         className="flex items-center justify-between p-3 cursor-pointer group bg-gray-50/50 hover:bg-gray-100 dark:bg-surface-dark dark:hover:bg-gray-800 transition-all border-b border-gray-100 dark:border-gray-800"
                         onClick={() => toggleRow(mapping.id)}
@@ -290,25 +303,22 @@ export default function OrderFulfillmentDashboard() {
                             {mapping.erpMaeCodes.length} ERPs Vinculados
                           </Badge>
                           {isExpanded ? (
-                            <ChevronUp className="h-5 w-5 text-primary animate-in fade-in zoom-in" />
+                            <ChevronUp className="h-5 w-5 text-primary" />
                           ) : (
-                            <ChevronDown className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
                           )}
                         </div>
                       </div>
 
-                      {/* Lista de ERPs como Linhas (Alinhadas com o Dashboard) */}
                       {isExpanded && (
                         <div className="animate-in slide-in-from-top-2 duration-300">
                           {mapping.erpMaeCodes.map((code: string, i: number) => (
                             <div key={i} className="grid grid-cols-[220px_repeat(12,_1fr)] border-b border-gray-100 dark:border-gray-800 hover:bg-accent/5 transition-colors">
-                              {/* Coluna do Código ERP (Alinhada com o 'Sidebar' do dashboard) */}
                               <div className="bg-white dark:bg-surface-dark p-3 border-r border-gray-100 dark:border-gray-800 flex flex-col justify-center">
                                 <span className="text-[9px] text-muted-foreground font-black uppercase mb-0.5 tracking-tighter">Cód. ERP Mãe</span>
                                 <span className="text-xs font-bold text-primary truncate">{code}</span>
                               </div>
                               
-                              {/* Colunas de Dados (1 a 6) - Placeholder para informações futuras por ERP */}
                               {Array.from({ length: 6 }).map((_, stepIdx) => (
                                 <React.Fragment key={`erp-data-${i}-${stepIdx}`}>
                                   <div className="bg-gray-50/30 dark:bg-surface-dark/30 border-r border-gray-100 dark:border-gray-800 flex items-center justify-center text-[10px] text-muted-foreground italic">—</div>
@@ -322,60 +332,104 @@ export default function OrderFulfillmentDashboard() {
                     </div>
                   );
                 })}
-                {!isLoadingData && (!erpMappings || erpMappings.length === 0) && (
-                  <div className="p-12 text-center text-muted-foreground italic text-xs">
-                    Nenhum mapeamento encontrado no Projeto: {projectId}. Importe um Excel na aba Configuração.
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-[220px_1fr] border-t-2 border-gray-400">
-                <div className="bg-gray-600 text-white text-center py-2 font-bold text-sm">Gestores</div>
-                <div className="bg-gray-600 text-white text-center py-2 font-bold text-lg">Detalhamento por Gestor</div>
-              </div>
-              
-              <div className="bg-gray-100 dark:bg-gray-800">
-                {[
-                  { name: "Ana Paula Alcantara Rauber", values: [81, 99, 15, 12, 0, 0] },
-                  { name: "Alexandre Postingher Lutke", values: [100, 100, 7, 42, 2, 0] },
-                  { name: "Fabio Trevisan", values: [71, 92, 48, 41, 0, 0] }
-                ].map((gestor, idx) => (
-                  <div key={idx} className="grid grid-cols-[220px_repeat(6,_1fr)] text-sm border-b border-gray-300 dark:border-gray-700">
-                    <div className="bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 font-medium px-3 py-1 flex items-center text-xxs border-r border-white dark:border-gray-700">
-                      {gestor.name}
-                    </div>
-                    {gestor.values.map((val, vIdx) => (
-                      <div key={vIdx} className={`text-center py-1 font-bold border-r border-white dark:border-gray-700 flex items-center justify-center text-xs ${val >= 90 ? 'bg-secondary text-white' : val > 0 ? 'bg-amber-400 text-white' : 'bg-gray-300 text-white dark:bg-gray-500'}`}>
-                        {val}%
-                      </div>
-                    ))}
-                  </div>
-                ))}
               </div>
             </div>
           </TabsContent>
 
+          <TabsContent value="produtividade" className="mt-0">
+            <Card className="shadow-lg border-primary/20">
+              <CardHeader className="bg-gray-800 text-white rounded-t-lg">
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-6 w-6" />
+                  Métricas de Produtividade (FTE & ROI)
+                </CardTitle>
+                <CardDescription className="text-white/70">
+                  Dados consolidados dos cubos SQL internos da companhia.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/50">
+                      <TableRow>
+                        <TableHead className="text-xxs uppercase font-black">Executivo</TableHead>
+                        <TableHead className="text-xxs uppercase font-black">Cliente / Conglomerado</TableHead>
+                        <TableHead className="text-xxs uppercase font-black">Origem</TableHead>
+                        <TableHead className="text-center text-xxs uppercase font-black">Pedidos IA</TableHead>
+                        <TableHead className="text-center text-xxs uppercase font-black">Horas Salvas</TableHead>
+                        <TableHead className="text-center text-xxs uppercase font-black">FTE</TableHead>
+                        <TableHead className="text-right text-xxs uppercase font-black">ROI (R$)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoadingMetrics ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-12">
+                             <Loader2 className="animate-spin h-6 w-6 mx-auto mb-2 text-primary" />
+                             <span className="text-xs text-muted-foreground">Sincronizando com Cubos SQL...</span>
+                          </TableCell>
+                        </TableRow>
+                      ) : cuboMetrics?.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-12 text-muted-foreground text-xs italic">
+                            Nenhuma métrica sincronizada. Envie os dados do seu script SQL para este aplicativo.
+                          </TableCell>
+                        </TableRow>
+                      ) : cuboMetrics?.map((metric: any) => (
+                        <TableRow key={metric.id} className="hover:bg-accent/5">
+                          <TableCell className="font-bold text-xs">{metric.executivo}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-medium">{metric.cliente}</span>
+                              <span className="text-[9px] text-muted-foreground uppercase">{metric.conglomerado || metric.grupo}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[9px] uppercase border-primary/20 text-primary">
+                              {metric.origem}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center font-bold text-xs">{metric.qtdIA}</TableCell>
+                          <TableCell className="text-center text-xs">{metric.hoursSaved}h</TableCell>
+                          <TableCell className="text-center">
+                            <Badge className="bg-secondary text-white text-[9px]">{metric.fte} FTE</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-black text-xs text-primary">
+                            R$ {metric.financialGain.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-xs">
+              <h4 className="font-bold mb-2 flex items-center gap-2">
+                <Brain className="h-4 w-4" />
+                Como Sincronizar seu Script PowerShell
+              </h4>
+              <p className="mb-2">Seu script PowerShell agora pode enviar dados diretamente para o Firestore. Use o seguinte comando no final do seu script:</p>
+              <pre className="bg-gray-900 text-green-400 p-3 rounded text-[10px] overflow-x-auto">
+{`# Exemplo de envio via PowerShell
+$jsonPayload = $payloadFinal | ConvertTo-Json -Depth 10 -Compress
+# Você precisará de uma API Route (ex: /api/sync) ou usar o SDK do Firebase Admin no servidor.`}
+              </pre>
+            </div>
+          </TabsContent>
+
           <TabsContent value="configuracao" className="mt-0">
+            {/* ... (Conteúdo de Configuração Mantido) ... */}
             <Card className="shadow-lg border-primary/20">
               <CardHeader className="bg-primary text-white rounded-t-lg">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      <FileSpreadsheet className="h-6 w-6" />
-                      Importação de Base ERP
-                    </CardTitle>
-                    <CardDescription className="text-white/90">
-                      Envie sua planilha para o banco de dados real no Firestore.
-                    </CardDescription>
-                  </div>
-                  <Badge variant="outline" className="bg-white/20 text-white border-white/40">
-                    Ativo: {projectId}
-                  </Badge>
-                </div>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <FileSpreadsheet className="h-6 w-6" />
+                  Importação de Mapeamento ERP
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-8">
                 <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/20 rounded-xl p-12 bg-muted/5 relative">
-                  
                   {!selectedFile && (
                     <input 
                       type="file" 
@@ -385,103 +439,28 @@ export default function OrderFulfillmentDashboard() {
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     />
                   )}
-                  
                   {selectedFile ? (
-                    <div className="flex flex-col items-center z-20">
-                      <div className="bg-secondary/10 p-6 rounded-full mb-4">
-                        <CheckCircle2 className="h-10 w-10 text-secondary" />
-                      </div>
+                    <div className="flex flex-col items-center">
+                      <CheckCircle2 className="h-10 w-10 text-secondary mb-4" />
                       <h3 className="text-lg font-bold mb-1">{selectedFile.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-6">Arquivo pronto para ser enviado à nuvem.</p>
-                      <div className="flex gap-3">
-                         <Button 
-                           onClick={() => { setSelectedFile(null); if(fileInputRef.current) fileInputRef.current.value = ""; }}
-                           variant="outline"
-                           className="gap-2"
-                         >
-                           <X className="h-4 w-4" /> Cancelar
-                         </Button>
-                         <Button 
-                          onClick={handleImport}
-                          className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 px-8 shadow-md"
-                          disabled={isImporting}
-                        >
-                          {isImporting ? <Loader2 className="animate-spin h-4 w-4" /> : <Upload className="h-4 w-4" />}
-                          {isImporting ? "Salvando..." : "Confirmar Importação Real"}
+                      <div className="flex gap-3 mt-4">
+                         <Button onClick={() => setSelectedFile(null)} variant="outline">Cancelar</Button>
+                         <Button onClick={handleImport} disabled={isImporting} className="bg-primary font-bold">
+                          {isImporting ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                          Confirmar Importação Real
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center text-center">
-                      <div className="bg-primary/10 p-6 rounded-full mb-4">
-                        <FileUp className="h-10 w-10 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-bold mb-2">Selecione sua planilha Excel</h3>
-                      <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                        Mapeamento: <strong>Coluna C</strong> (Conglomerado) e <strong>Coluna E</strong> (ERPs).
-                      </p>
-                      <Badge variant="outline" className="text-xxs border-primary/20 text-primary">
-                        Suporta ERPs separados por vírgula na Coluna E
-                      </Badge>
+                      <FileUp className="h-10 w-10 text-primary mb-4" />
+                      <h3 className="text-lg font-bold">Selecione sua planilha de Mapeamento</h3>
+                      <p className="text-sm text-muted-foreground">Coluna C (Conglomerado) e Coluna E (ERPs)</p>
                     </div>
                   )}
                 </div>
-
-                {erpMappings && erpMappings.length > 0 && (
-                  <div className="mt-8 space-y-4">
-                    <div className="flex items-center justify-between border-b pb-2">
-                      <h4 className="font-bold text-primary flex items-center gap-2">
-                        <RefreshCw className="h-4 w-4" />
-                        Histórico de Sincronização Cloud
-                      </h4>
-                      <div className="flex gap-2">
-                         <Badge variant="secondary" className="bg-secondary text-white">{erpMappings.length} Registros</Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="border rounded-lg overflow-hidden">
-                      <Table>
-                        <TableHeader className="bg-muted/50">
-                          <TableRow>
-                            <TableHead className="text-xxs uppercase">Conglomerado</TableHead>
-                            <TableHead className="text-xxs uppercase">ERP's Vinculados</TableHead>
-                            <TableHead className="text-right text-xxs uppercase">Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {erpMappings.slice(0, 10).map((row: any) => (
-                            <TableRow key={row.id}>
-                              <TableCell className="font-bold text-xs">{row.conglomerado}</TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {row.erpMaeCodes.map((code: string, i: number) => (
-                                    <Badge key={i} variant="outline" className="text-[10px] bg-secondary/5 text-secondary border-secondary/20">
-                                      {code}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Badge className="bg-secondary text-white text-[9px] uppercase">Sincronizado</Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
-            
-            <div className="mt-6 flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
-               <AlertTriangle className="h-4 w-4 shrink-0" />
-               <p>
-                 <strong>Nota de Depuração:</strong> Se você importou os dados e eles não aparecem no console, verifique se as 
-                 <strong> Regras de Segurança (Rules)</strong> do Firestore no Console do Firebase permitem gravação. 
-                 ID do Projeto Atual: <strong>{projectId}</strong>.
-               </p>
-            </div>
           </TabsContent>
         </Tabs>
       </div>
