@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "ErpMapping": {
@@ -31,6 +32,7 @@
       "properties": {
         "executivo": { "type": "string" },
         "cliente": { "type": "string" },
+        "conglomerado": { "type": "string" },
         "mes": { "type": "string" },
         "qtdIA": { "type": "number" },
         "qtdTotal": { "type": "number" },

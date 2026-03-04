@@ -1,6 +1,7 @@
+
 import { NextResponse } from 'next/server';
 import { initializeFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch, doc } from 'firebase/firestore';
 
 /**
  * Endpoint de Sincronização para Scripts PowerShell.
@@ -9,9 +10,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 export async function POST(request: Request) {
   const { firestore } = initializeFirebase();
   
-  // Verificação de Segurança Simples
   const apiKey = request.headers.get('x-api-key');
-  // Em produção, use uma variável de ambiente: process.env.SYNC_API_KEY
   const VALID_KEY = 'fluxo-vision-master-key-2025';
 
   if (apiKey !== VALID_KEY) {
@@ -23,22 +22,24 @@ export async function POST(request: Request) {
     const metrics = body.data || [];
     const cuboRef = collection(firestore, 'cubo_metrics');
 
+    // Em uma implementação de produção, você poderia usar um batch ou 
+    // atualizar registros existentes em vez de apenas adicionar novos.
     let count = 0;
-    // Processa os dados vindos do script PowerShell
     for (const item of metrics) {
       await addDoc(cuboRef, {
-        executivo: item.nome,
-        cliente: item.cliente,
-        mes: item.month,
+        executivo: item.nome || 'Não Informado',
+        cliente: item.cliente || 'Não Informado',
+        conglomerado: item.conglomerado || item.cliente || 'Não Informado',
+        mes: item.month || '',
         qtdIA: item.totalOrders || item.orders || 0,
         qtdTotal: item.ordersOp || 0,
         hoursSaved: item.hoursSaved || 0,
         fte: item.fte || 0,
         financialGain: item.financialGain || 0,
-        grupo: item.grupo,
-        origem: item.origem,
-        fase: item.fase,
-        dataImpl: item.implDate,
+        grupo: item.grupo || '',
+        origem: item.origem || '',
+        fase: item.fase || '',
+        dataImpl: item.implDate || '',
         updatedAt: serverTimestamp()
       });
       count++;
