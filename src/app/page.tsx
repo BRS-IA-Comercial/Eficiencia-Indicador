@@ -17,10 +17,13 @@ import {
   ChevronsUp,
   User,
   Building2,
-  Cpu
+  Cpu,
+  Server,
+  Terminal,
+  Code
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useFirestore, useCollection, useFirebaseApp } from "@/firebase";
@@ -69,12 +72,10 @@ export default function OrderFulfillmentDashboard() {
     const executives: Record<string, any> = {};
     const conglomerateToErp: Record<string, string[]> = {};
     
-    // Mapeia os dados do Excel (Conglomerado -> Lista de ERPs)
     erpMappings.forEach((m: any) => {
       conglomerateToErp[m.conglomerado] = m.erpMaeCodes;
     });
 
-    // Agrupa dados do Cubo (Executivo -> Conglomerado)
     cuboMetrics.forEach((m: any) => {
       const execName = m.executivo || "Não Definido";
       const congName = m.conglomerado || m.cliente || "Não Mapeado";
@@ -141,7 +142,6 @@ export default function OrderFulfillmentDashboard() {
             importedAt: serverTimestamp()
           };
 
-          // Usamos o NOME do conglomerado como ID fixo para evitar duplicatas
           const mappingRef = doc(db, "erp_mappings", conglomerado);
           
           setDoc(mappingRef, payload, { merge: true }).catch(async () => {
@@ -174,14 +174,14 @@ export default function OrderFulfillmentDashboard() {
           <div className="flex justify-between items-center mb-4">
             <TabsList className="bg-white dark:bg-surface-dark shadow-sm border">
               <TabsTrigger value="dashboard" className="gap-2">
-                <LayoutDashboard className="h-4 w-4" /> Dashboard de Processos
+                <LayoutDashboard className="h-4 w-4" /> Dashboard Operacional
               </TabsTrigger>
               <TabsTrigger value="configuracao" className="gap-2">
-                <SettingsIcon className="h-4 w-4" /> Sincronização & API
+                <SettingsIcon className="h-4 w-4" /> Configuração & Automação
               </TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-4">
-               <Badge variant="outline" className="bg-white gap-2 px-3 py-1 border-primary/20 text-primary">
+               <Badge variant="outline" className="bg-white gap-2 px-3 py-1 border-primary/20 text-primary font-mono text-xs">
                   <Database className="h-3 w-3" /> {projectId}
                </Badge>
             </div>
@@ -344,19 +344,35 @@ export default function OrderFulfillmentDashboard() {
               <Card className="shadow-lg border-primary/20">
                 <CardHeader className="bg-gray-800 text-white rounded-t-lg">
                   <CardTitle className="text-xl flex items-center gap-2">
-                    <Database className="h-6 w-6" /> Automação PowerShell (Cubo)
+                    <Server className="h-6 w-6" /> Automação & IIS
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
-                    <h4 className="font-bold mb-2">Instruções para o Servidor</h4>
-                    <p className="text-xs mb-3">O script envia dados vinculados ao Cliente. Se o Executivo mudar no SQL, o Dashboard atualizará automaticamente.</p>
-                    <code className="block bg-gray-900 text-green-400 p-3 rounded text-xxs mb-4 select-all">
-                      POST https://{host || '...'}/api/sync
-                    </code>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold uppercase text-muted-foreground">Header de Autenticação:</p>
-                      <code className="block bg-gray-100 p-2 rounded text-[10px] border">x-api-key: fluxo-vision-master-key-2025</code>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-muted/20 border rounded-lg">
+                      <h4 className="font-bold text-sm flex items-center gap-2 mb-2">
+                        <Terminal className="h-4 w-4 text-primary" /> PowerShell Script (Task Scheduler)
+                      </h4>
+                      <p className="text-xs text-muted-foreground mb-3">Use o código abaixo no seu servidor interno para enviar os dados do SQL Server.</p>
+                      <pre className="bg-black text-green-400 p-3 rounded text-[10px] overflow-x-auto select-all">
+                        {`$apiUrl = "http://${host || 'localhost'}/api/sync"
+$apiKey = "fluxo-vision-master-key-2025"
+
+$headers = @{ "x-api-key" = $apiKey; "Content-Type" = "application/json" }
+Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $jsonContent`}
+                      </pre>
+                    </div>
+
+                    <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                      <h4 className="font-bold text-sm flex items-center gap-2 mb-2">
+                        <Code className="h-4 w-4 text-primary" /> Deploy no IIS
+                      </h4>
+                      <ol className="text-xs space-y-1 list-decimal ml-4">
+                        <li>Instale Node.js e URL Rewrite no Windows Server.</li>
+                        <li>Rode <code className="bg-muted px-1">npm run build</code> localmente.</li>
+                        <li>Copie as pastas <code className="bg-muted px-1">.next</code>, <code className="bg-muted px-1">public</code> e <code className="bg-muted px-1">node_modules</code>.</li>
+                        <li>O arquivo <code className="bg-muted px-1">web.config</code> já está na raiz para configurar o iisnode.</li>
+                      </ol>
                     </div>
                   </div>
                 </CardContent>
