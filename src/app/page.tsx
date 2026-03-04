@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { 
   LayoutDashboard, 
   Settings as SettingsIcon, 
@@ -93,7 +93,7 @@ export default function OrderFulfillmentDashboard() {
       const erpMappingsRef = collection(db, "erp_mappings");
       let count = 0;
 
-      for (let i = 0; i < rows.length; i++) {
+      for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         const conglomerado = row[2];
         const erpMaeRaw = row[4];
@@ -171,7 +171,7 @@ export default function OrderFulfillmentDashboard() {
           </div>
 
           <TabsContent value="dashboard" className="mt-0">
-            <div className="bg-surface-light dark:bg-surface-dark shadow-xl rounded-lg overflow-hidden border border-border-light dark:border-border-dark">
+            <div className="bg-surface-light dark:bg-surface-dark shadow-xl rounded-lg overflow-hidden border border-border-light dark:border-border-dark min-w-[1200px]">
               <header className="bg-primary text-white text-center py-3 font-bold text-xl uppercase tracking-wide border-b border-white dark:border-gray-700">
                 Etapas do Processo de Atendimento de Pedidos
               </header>
@@ -204,7 +204,7 @@ export default function OrderFulfillmentDashboard() {
               </div>
 
               <div className="grid grid-cols-[220px_repeat(12,_1fr)] text-sm">
-                <div className="bg-secondary text-white font-bold flex items-center justify-center text-center p-2 border-r border-b border-white dark:border-gray-700 text-lg">
+                <div className="bg-secondary text-white font-bold flex items-center justify-center text-center p-2 border-r border-b border-white dark:border-gray-700 text-lg leading-tight">
                   Processos Automatizados
                 </div>
                 <div className="col-span-2 grid grid-cols-2 grid-rows-3">
@@ -264,7 +264,7 @@ export default function OrderFulfillmentDashboard() {
                 </div>
               </div>
               
-              <div className="max-h-[400px] overflow-y-auto bg-white dark:bg-surface-dark divide-y divide-gray-200 dark:divide-gray-700">
+              <div className="max-h-[600px] overflow-y-auto bg-white dark:bg-surface-dark divide-y divide-gray-200 dark:divide-gray-700">
                 {isLoadingData && (
                   <div className="p-8 text-center text-muted-foreground">
                     <Loader2 className="animate-spin inline mr-2 h-4 w-4" /> Sincronizando com Firestore...
@@ -273,48 +273,57 @@ export default function OrderFulfillmentDashboard() {
                 {erpMappings?.map((mapping: any) => {
                   const isExpanded = !!expandedRows[mapping.id];
                   return (
-                    <div key={mapping.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      {/* Header do Cliente */}
+                    <div key={mapping.id} className="transition-colors">
+                      {/* Header do Cliente (Conglomerado) */}
                       <div 
-                        className="flex items-center justify-between p-3 cursor-pointer group"
+                        className="flex items-center justify-between p-3 cursor-pointer group bg-gray-50/50 hover:bg-gray-100 dark:bg-surface-dark dark:hover:bg-gray-800 transition-all border-b border-gray-100 dark:border-gray-800"
                         onClick={() => toggleRow(mapping.id)}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-1.5 h-6 bg-primary rounded-full" />
-                          <span className="font-bold text-xs text-gray-700 dark:text-gray-200 uppercase tracking-tight">
+                          <div className="w-1.5 h-6 bg-primary rounded-full shadow-sm" />
+                          <span className="font-black text-sm text-gray-800 dark:text-gray-100 uppercase tracking-tight">
                             {mapping.conglomerado}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[9px] text-muted-foreground border-gray-200">
-                            {mapping.erpMaeCodes.length} ERPs
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="text-[10px] font-bold text-muted-foreground border-gray-200 bg-white dark:bg-surface-dark px-2">
+                            {mapping.erpMaeCodes.length} ERPs Vinculados
                           </Badge>
                           {isExpanded ? (
-                            <ChevronUp className="h-4 w-4 text-primary" />
+                            <ChevronUp className="h-5 w-5 text-primary animate-in fade-in zoom-in" />
                           ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                            <ChevronDown className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                           )}
                         </div>
                       </div>
 
-                      {/* Lista de ERPs (Expandível) */}
+                      {/* Lista de ERPs como Linhas (Alinhadas com o Dashboard) */}
                       {isExpanded && (
-                        <div className="px-6 pb-4 pt-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-                            {mapping.erpMaeCodes.map((code: string, i: number) => (
-                              <div key={i} className="flex flex-col bg-gray-50 dark:bg-gray-800 border rounded p-2 transition-all hover:border-primary/50">
-                                <span className="text-[10px] text-muted-foreground font-medium uppercase mb-1">Cód. ERP</span>
-                                <span className="text-xs font-bold text-primary">{code}</span>
+                        <div className="animate-in slide-in-from-top-2 duration-300">
+                          {mapping.erpMaeCodes.map((code: string, i: number) => (
+                            <div key={i} className="grid grid-cols-[220px_repeat(12,_1fr)] border-b border-gray-100 dark:border-gray-800 hover:bg-accent/5 transition-colors">
+                              {/* Coluna do Código ERP (Alinhada com o 'Sidebar' do dashboard) */}
+                              <div className="bg-white dark:bg-surface-dark p-3 border-r border-gray-100 dark:border-gray-800 flex flex-col justify-center">
+                                <span className="text-[9px] text-muted-foreground font-black uppercase mb-0.5 tracking-tighter">Cód. ERP Mãe</span>
+                                <span className="text-xs font-bold text-primary truncate">{code}</span>
                               </div>
-                            ))}
-                          </div>
+                              
+                              {/* Colunas de Dados (1 a 6) - Placeholder para informações futuras por ERP */}
+                              {Array.from({ length: 6 }).map((_, stepIdx) => (
+                                <React.Fragment key={`erp-data-${i}-${stepIdx}`}>
+                                  <div className="bg-gray-50/30 dark:bg-surface-dark/30 border-r border-gray-100 dark:border-gray-800 flex items-center justify-center text-[10px] text-muted-foreground italic">—</div>
+                                  <div className="bg-white dark:bg-surface-dark border-r border-gray-100 dark:border-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-400">0%</div>
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
                   );
                 })}
                 {!isLoadingData && (!erpMappings || erpMappings.length === 0) && (
-                  <div className="p-8 text-center text-muted-foreground italic text-xs">
+                  <div className="p-12 text-center text-muted-foreground italic text-xs">
                     Nenhum mapeamento encontrado no Projeto: {projectId}. Importe um Excel na aba Configuração.
                   </div>
                 )}
