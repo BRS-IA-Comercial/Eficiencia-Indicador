@@ -39,10 +39,7 @@
         "hoursSaved": { "type": "number" },
         "fte": { "type": "number" },
         "financialGain": { "type": "number" },
-        "grupo": { "type": "string" },
-        "origem": { "type": "string" },
-        "fase": { "type": "string" },
-        "dataImpl": { "type": "string" },
+        "flagProgAuto": { "type": "boolean", "description": "Status da Etapa 4 (Programação Automática)" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
     }

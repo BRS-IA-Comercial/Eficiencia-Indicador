@@ -6,7 +6,6 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 /**
  * Endpoint de Sincronização para Scripts PowerShell.
  * Recebe o payload do Cubo SQL e atualiza no Firestore.
- * Prioriza o uso de IDs únicos (Código do Cliente) para evitar duplicidade.
  */
 export async function POST(request: Request) {
   const { firestore } = initializeFirebase();
@@ -24,8 +23,7 @@ export async function POST(request: Request) {
     
     let count = 0;
     for (const item of metrics) {
-      // Usamos o CdExtCliente (ou cliente se o código não for enviado) como ID estável
-      // Recomendação: No PowerShell, adicione o CdExtCliente ao objeto enviado.
+      // Usamos o CdExtCliente como ID estável
       const uniqueId = String(item.cdExtCliente || item.cliente || "Desconhecido").trim();
       
       if (uniqueId === "Desconhecido") continue;
@@ -42,12 +40,9 @@ export async function POST(request: Request) {
         hoursSaved: item.hoursSaved || 0,
         fte: item.fte || 0,
         financialGain: item.financialGain || 0,
-        grupo: item.grupo || '',
-        origem: item.origem || '',
-        fase: item.fase || '',
-        dataImpl: item.implDate || '',
+        flagProgAuto: item.flagProgAuto === 1 || item.flagProgAuto === true, // Etapa 4
         updatedAt: serverTimestamp()
-      }, { merge: true }); // Merge garante que mudanças de executivo apenas atualizem o campo
+      }, { merge: true });
       
       count++;
     }

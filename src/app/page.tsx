@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
@@ -22,7 +23,7 @@ import {
   Code
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useFirestore, useCollection, useFirebaseApp } from "@/firebase";
@@ -70,6 +71,7 @@ export default function OrderFulfillmentDashboard() {
 
     const executives: Record<string, any> = {};
     const conglomerateToErp: Record<string, string[]> = {};
+    const metricByErp: Record<string, any> = {};
     
     erpMappings.forEach((m: any) => {
       conglomerateToErp[m.conglomerado] = m.erpMaeCodes;
@@ -78,6 +80,9 @@ export default function OrderFulfillmentDashboard() {
     cuboMetrics.forEach((m: any) => {
       const execName = m.executivo || "Não Definido";
       const congName = m.conglomerado || m.cliente || "Não Mapeado";
+      const erpCode = m.id; // uniqueId usado no sync
+
+      metricByErp[erpCode] = m;
 
       if (!executives[execName]) {
         executives[execName] = { name: execName, conglomerates: new Set() };
@@ -89,7 +94,10 @@ export default function OrderFulfillmentDashboard() {
       ...exec,
       conglomerates: Array.from(exec.conglomerates).map((congName: any) => ({
         name: congName,
-        erps: conglomerateToErp[congName] || []
+        erps: (conglomerateToErp[congName] || []).map(code => ({
+          code,
+          metric: metricByErp[code] || null
+        }))
       }))
     })).sort((a, b) => a.name.localeCompare(b.name));
   }, [cuboMetrics, erpMappings]);
@@ -196,10 +204,10 @@ export default function OrderFulfillmentDashboard() {
                 <div className="bg-white dark:bg-surface-dark p-3 font-bold text-muted-foreground uppercase text-xxs tracking-widest flex items-center gap-2">
                   <User className="h-3 w-3" /> Hierarquia de Atendimento
                 </div>
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="bg-primary/90 text-white p-2 text-center font-bold text-[10px] flex flex-col items-center justify-center border-l border-white/20">
+                {["PROSPECÇÃO", "MAPEAMENTO", "HOMOLOGAÇÃO", "PROG. AUTO.", "TREINAMENTO", "PRODUÇÃO"].map((label, i) => (
+                  <div key={i} className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-l border-white/20">
                     <span className="opacity-70">ETAPA</span>
-                    <span className="text-lg">{i}</span>
+                    <span className="text-[10px] uppercase">{label}</span>
                   </div>
                 ))}
               </div>
@@ -265,27 +273,41 @@ export default function OrderFulfillmentDashboard() {
                                 {isCongExpanded && (
                                   <div className="animate-in slide-in-from-top-1 duration-150">
                                     {cong.erps.length > 0 ? (
-                                      cong.erps.map((code: string, i: number) => (
-                                        <div key={i} className="grid grid-cols-[300px_repeat(6,_1fr)] border-t border-gray-100 dark:border-gray-800 hover:bg-primary/5 group transition-colors">
-                                          <div className="p-3 pl-12 flex items-center gap-2 border-r bg-gray-50/30 dark:bg-gray-900/10">
-                                            <Cpu className="h-3 w-3 text-muted-foreground" />
-                                            <div className="flex flex-col">
-                                              <span className="text-[8px] text-muted-foreground font-black uppercase tracking-tighter">Cód. ERP Mãe</span>
-                                              <span className="text-xs font-bold text-primary">{code}</span>
-                                            </div>
-                                          </div>
-                                          {[1, 2, 3, 4, 5, 6].map((step) => (
-                                            <div key={step} className="p-3 flex items-center justify-center border-r last:border-r-0">
-                                              <div className="flex flex-col items-center">
-                                                <span className="text-[10px] font-bold text-gray-400 group-hover:text-primary transition-colors">0%</span>
-                                                <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden mt-1">
-                                                  <div className="bg-primary h-full w-0 transition-all duration-500" />
-                                                </div>
+                                      cong.erps.map((erp: any, i: number) => {
+                                        const isAuto = erp.metric?.flagProgAuto;
+                                        return (
+                                          <div key={i} className="grid grid-cols-[300px_repeat(6,_1fr)] border-t border-gray-100 dark:border-gray-800 hover:bg-primary/5 group transition-colors">
+                                            <div className="p-3 pl-12 flex items-center gap-2 border-r bg-gray-50/30 dark:bg-gray-900/10">
+                                              <Cpu className="h-3 w-3 text-muted-foreground" />
+                                              <div className="flex flex-col">
+                                                <span className="text-[8px] text-muted-foreground font-black uppercase tracking-tighter">Cód. ERP Mãe</span>
+                                                <span className="text-xs font-bold text-primary">{erp.code}</span>
                                               </div>
                                             </div>
-                                          ))}
-                                        </div>
-                                      ))
+                                            {[1, 2, 3, 4, 5, 6].map((step) => {
+                                              // Dinâmica da Etapa 4 baseada na flag do banco
+                                              const percentage = (step === 4 && isAuto) ? 100 : 0;
+                                              const statusText = (step === 4 && isAuto) ? "ATIVO" : "0%";
+                                              
+                                              return (
+                                                <div key={step} className="p-3 flex items-center justify-center border-r last:border-r-0">
+                                                  <div className="flex flex-col items-center">
+                                                    <span className={`text-[10px] font-bold ${percentage > 0 ? 'text-secondary' : 'text-gray-400'} group-hover:text-primary transition-colors`}>
+                                                      {statusText}
+                                                    </span>
+                                                    <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden mt-1">
+                                                      <div 
+                                                        className={`${percentage > 0 ? 'bg-secondary' : 'bg-primary'} h-full transition-all duration-500`} 
+                                                        style={{ width: `${percentage}%` }} 
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        );
+                                      })
                                     ) : (
                                       <div className="p-3 pl-12 text-[10px] text-muted-foreground italic bg-yellow-50/30">
                                         Nenhum ERP mapeado para este conglomerado.
@@ -352,19 +374,38 @@ export default function OrderFulfillmentDashboard() {
                       <h4 className="font-bold text-sm flex items-center gap-2 mb-2">
                         <Terminal className="h-4 w-4 text-primary" /> PowerShell Script (Configurado)
                       </h4>
-                      <p className="text-xs text-muted-foreground mb-3">Copie este bloco para o seu servidor. Ele já inclui as credenciais do SQL Server informadas.</p>
+                      <p className="text-xs text-muted-foreground mb-3">O script agora inclui a coluna de Programação Automática para a Etapa 4.</p>
                       <pre className="bg-black text-green-400 p-3 rounded text-[10px] overflow-x-auto select-all">
-{`# --- CONFIGURAÇÕES DO SQL ---
+{`# --- 1. CONFIGURAÇÕES ---
 $Server = "192.168.0.18"
 $Database = "brweb"
 $User = "power_Bi"
 $Password = "brs123#"
-
-# --- CONFIGURAÇÕES DA API ---
 $apiUrl = "http://${host || 'localhost'}/api/sync"
 $apiKey = "fluxo-vision-master-key-2025"
 
-# --- ENVIO DOS DADOS ---
+# --- 2. QUERY ATUALIZADA (ETAPA 4) ---
+$Query = @"
+SELECT 
+    CdExtCliente, 
+    Cart_Executivo_Vendas as Executivo, 
+    NmCliente as Cliente, 
+    NmConglomerado as Conglomerado,
+    FlagProgramacaoAutomatica -- SUA NOVA COLUNA
+FROM BR_Cliente_Cubo
+"@
+
+# --- 3. EXECUÇÃO E ENVIO ---
+# (Lógica de conexão SQL omitida para brevidade...)
+# No loop de processamento, adicione:
+$ResultData += @{
+    cdExtCliente = $Row["CdExtCliente"]
+    nome         = $Row["Executivo"]
+    cliente      = $Row["Cliente"]
+    conglomerado = $Row["Conglomerado"]
+    flagProgAuto = $Row["FlagProgramacaoAutomatica"] # MAPEA PARA ETAPA 4
+}
+
 $headers = @{ "x-api-key" = $apiKey; "Content-Type" = "application/json" }
 $jsonBody = @{ data = $ResultData } | ConvertTo-Json -Depth 5 -Compress
 Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $jsonBody`}
