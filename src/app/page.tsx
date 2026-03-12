@@ -173,6 +173,16 @@ export default function OrderFulfillmentDashboard() {
     }
   };
 
+  // Nomes das etapas atualizados conforme solicitação
+  const stages = [
+    "Entrada de Pedidos",
+    "Programação de Pedidos",
+    "Liberação de Pedidos",
+    "Geração de OV",
+    "Tratamento de Rupturas",
+    "Ocorrências de Entrega"
+  ];
+
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark font-body p-4">
       <div className="max-w-[1600px] mx-auto space-y-4">
@@ -204,9 +214,9 @@ export default function OrderFulfillmentDashboard() {
                 <div className="bg-white dark:bg-surface-dark p-3 font-bold text-muted-foreground uppercase text-xxs tracking-widest flex items-center gap-2">
                   <User className="h-3 w-3" /> Hierarquia de Atendimento
                 </div>
-                {["PROSPECÇÃO", "MAPEAMENTO", "HOMOLOGAÇÃO", "PROG. AUTO.", "TREINAMENTO", "PRODUÇÃO"].map((label, i) => (
+                {stages.map((label, i) => (
                   <div key={i} className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-l border-white/20">
-                    <span className="opacity-70">ETAPA</span>
+                    <span className="opacity-70">ETAPA {i + 1}</span>
                     <span className="text-[10px] uppercase">{label}</span>
                   </div>
                 ))}
@@ -285,6 +295,7 @@ export default function OrderFulfillmentDashboard() {
                                               </div>
                                             </div>
                                             {[1, 2, 3, 4, 5, 6].map((step) => {
+                                              // A Etapa 4 (Geração de OV) é alimentada pela FlagUtilizaLiberacaoAutomatica
                                               const percentage = (step === 4 && isAuto) ? 100 : 0;
                                               const statusText = (step === 4 && isAuto) ? "ATIVO" : "0%";
                                               
@@ -373,7 +384,7 @@ export default function OrderFulfillmentDashboard() {
                       <h4 className="font-bold text-sm flex items-center gap-2 mb-2">
                         <Terminal className="h-4 w-4 text-primary" /> PowerShell Script (Configurado)
                       </h4>
-                      <p className="text-xs text-muted-foreground mb-3">O script agora utiliza a coluna técnica <b>FlagUtilizaLiberacaoAutomatica</b> para a Etapa 4.</p>
+                      <p className="text-xs text-muted-foreground mb-3">O script agora utiliza a coluna técnica <b>FlagUtilizaLiberacaoAutomatica</b> para a Etapa 4 (Geração de OV).</p>
                       <pre className="bg-black text-green-400 p-3 rounded text-[10px] overflow-x-auto select-all">
 {`# --- 1. CONFIGURAÇÕES ---
 $Server = "192.168.0.18"
@@ -390,7 +401,7 @@ SELECT
     Cart_Executivo_Vendas as Executivo, 
     NmCliente as Cliente, 
     NmConglomerado as Conglomerado,
-    FlagUtilizaLiberacaoAutomatica -- SUA NOVA COLUNA AJUSTADA
+    FlagUtilizaLiberacaoAutomatica -- COLUNA PARA ETAPA 4
 FROM BR_Cliente_Cubo
 "@
 
@@ -401,7 +412,7 @@ $ResultData += @{
     nome         = $Row["Executivo"]
     cliente      = $Row["Cliente"]
     conglomerado = $Row["Conglomerado"]
-    flagProgAuto = $Row["FlagUtilizaLiberacaoAutomatica"] # MAPEA PARA ETAPA 4
+    flagProgAuto = $Row["FlagUtilizaLiberacaoAutomatica"] # MAPEA PARA ETAPA 4 (Geração de OV)
 }
 
 $headers = @{ "x-api-key" = $apiKey; "Content-Type" = "application/json" }
