@@ -285,7 +285,6 @@ export default function OrderFulfillmentDashboard() {
                                               </div>
                                             </div>
                                             {[1, 2, 3, 4, 5, 6].map((step) => {
-                                              // Dinâmica da Etapa 4 baseada na flag do banco
                                               const percentage = (step === 4 && isAuto) ? 100 : 0;
                                               const statusText = (step === 4 && isAuto) ? "ATIVO" : "0%";
                                               
@@ -374,7 +373,7 @@ export default function OrderFulfillmentDashboard() {
                       <h4 className="font-bold text-sm flex items-center gap-2 mb-2">
                         <Terminal className="h-4 w-4 text-primary" /> PowerShell Script (Configurado)
                       </h4>
-                      <p className="text-xs text-muted-foreground mb-3">O script agora inclui a coluna de Programação Automática para a Etapa 4.</p>
+                      <p className="text-xs text-muted-foreground mb-3">O script agora utiliza a coluna técnica <b>FlagUtilizaLiberacaoAutomatica</b> para a Etapa 4.</p>
                       <pre className="bg-black text-green-400 p-3 rounded text-[10px] overflow-x-auto select-all">
 {`# --- 1. CONFIGURAÇÕES ---
 $Server = "192.168.0.18"
@@ -391,19 +390,18 @@ SELECT
     Cart_Executivo_Vendas as Executivo, 
     NmCliente as Cliente, 
     NmConglomerado as Conglomerado,
-    FlagProgramacaoAutomatica -- SUA NOVA COLUNA
+    FlagUtilizaLiberacaoAutomatica -- SUA NOVA COLUNA AJUSTADA
 FROM BR_Cliente_Cubo
 "@
 
 # --- 3. EXECUÇÃO E ENVIO ---
-# (Lógica de conexão SQL omitida para brevidade...)
-# No loop de processamento, adicione:
+# (Lógica de conexão SQL...)
 $ResultData += @{
     cdExtCliente = $Row["CdExtCliente"]
     nome         = $Row["Executivo"]
     cliente      = $Row["Cliente"]
     conglomerado = $Row["Conglomerado"]
-    flagProgAuto = $Row["FlagProgramacaoAutomatica"] # MAPEA PARA ETAPA 4
+    flagProgAuto = $Row["FlagUtilizaLiberacaoAutomatica"] # MAPEA PARA ETAPA 4
 }
 
 $headers = @{ "x-api-key" = $apiKey; "Content-Type" = "application/json" }
