@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
@@ -351,15 +350,24 @@ export default function OrderFulfillmentDashboard() {
                   <div className="space-y-4">
                     <div className="p-4 bg-muted/20 border rounded-lg">
                       <h4 className="font-bold text-sm flex items-center gap-2 mb-2">
-                        <Terminal className="h-4 w-4 text-primary" /> PowerShell Script (Task Scheduler)
+                        <Terminal className="h-4 w-4 text-primary" /> PowerShell Script (Configurado)
                       </h4>
-                      <p className="text-xs text-muted-foreground mb-3">Use o código abaixo no seu servidor interno para enviar os dados do SQL Server.</p>
+                      <p className="text-xs text-muted-foreground mb-3">Copie este bloco para o seu servidor. Ele já inclui as credenciais do SQL Server informadas.</p>
                       <pre className="bg-black text-green-400 p-3 rounded text-[10px] overflow-x-auto select-all">
-                        {`$apiUrl = "http://${host || 'localhost'}/api/sync"
+{`# --- CONFIGURAÇÕES DO SQL ---
+$Server = "192.168.0.18"
+$Database = "brweb"
+$User = "power_Bi"
+$Password = "brs123#"
+
+# --- CONFIGURAÇÕES DA API ---
+$apiUrl = "http://${host || 'localhost'}/api/sync"
 $apiKey = "fluxo-vision-master-key-2025"
 
+# --- ENVIO DOS DADOS ---
 $headers = @{ "x-api-key" = $apiKey; "Content-Type" = "application/json" }
-Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $jsonContent`}
+$jsonBody = @{ data = $ResultData } | ConvertTo-Json -Depth 5 -Compress
+Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $jsonBody`}
                       </pre>
                     </div>
 
@@ -370,8 +378,8 @@ Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $jsonContent
                       <ol className="text-xs space-y-1 list-decimal ml-4">
                         <li>Instale Node.js e URL Rewrite no Windows Server.</li>
                         <li>Rode <code className="bg-muted px-1">npm run build</code> localmente.</li>
-                        <li>Copie as pastas <code className="bg-muted px-1">.next</code>, <code className="bg-muted px-1">public</code> e <code className="bg-muted px-1">node_modules</code>.</li>
-                        <li>O arquivo <code className="bg-muted px-1">web.config</code> já está na raiz para configurar o iisnode.</li>
+                        <li>Suba o código para o Github e dê um <code className="bg-muted px-1">git pull</code> no servidor.</li>
+                        <li>O arquivo <code className="bg-muted px-1">web.config</code> configurará o roteamento automático.</li>
                       </ol>
                     </div>
                   </div>
