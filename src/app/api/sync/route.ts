@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   const { firestore } = initializeFirebase();
   
   const apiKey = request.headers.get('x-api-key');
-  const VALID_KEY = 'fluxo-vision-master-key-2025';
+  const VALID_KEY = process.env.SYNC_API_KEY;
 
   if (apiKey !== VALID_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

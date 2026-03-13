@@ -295,7 +295,7 @@ export default function OrderFulfillmentDashboard() {
                                               </div>
                                             </div>
                                             {[1, 2, 3, 4, 5, 6].map((step) => {
-                                              // A Etapa 4 (Geração de OV) é alimentada pela FlagUtilizaLiberacaoAutomatica
+                                              // A Etapa 4 (Geração de OV) é alimentada pela IntegracaoAutomaticaSAP
                                               const percentage = (step === 4 && isAuto) ? 100 : 0;
                                               const statusText = (step === 4 && isAuto) ? "ATIVO" : "0%";
                                               
@@ -384,7 +384,7 @@ export default function OrderFulfillmentDashboard() {
                       <h4 className="font-bold text-sm flex items-center gap-2 mb-2">
                         <Terminal className="h-4 w-4 text-primary" /> PowerShell Script (Configurado)
                       </h4>
-                      <p className="text-xs text-muted-foreground mb-3">O script agora utiliza a coluna técnica <b>FlagUtilizaLiberacaoAutomatica</b> para a Etapa 4 (Geração de OV).</p>
+                      <p className="text-xs text-muted-foreground mb-3">O script agora utiliza a coluna técnica <b>IntegracaoAutomaticaSAP</b> para a Etapa 4 (Geração de OV).</p>
                       <pre className="bg-black text-green-400 p-3 rounded text-[10px] overflow-x-auto select-all">
 {`# --- 1. CONFIGURAÇÕES ---
 $Server = "192.168.0.18"
@@ -392,7 +392,7 @@ $Database = "brweb"
 $User = "power_Bi"
 $Password = "brs123#"
 $apiUrl = "http://${host || 'localhost'}/api/sync"
-$apiKey = "fluxo-vision-master-key-2025"
+$apiKey = "SUA_CHAVE_CONFIGURADA_NO_ENV"
 
 # --- 2. QUERY ATUALIZADA (ETAPA 4) ---
 $Query = @"
@@ -401,7 +401,7 @@ SELECT
     Cart_Executivo_Vendas as Executivo, 
     NmCliente as Cliente, 
     NmConglomerado as Conglomerado,
-    FlagUtilizaLiberacaoAutomatica -- COLUNA PARA ETAPA 4
+    IntegracaoAutomaticaSAP -- COLUNA PARA ETAPA 4
 FROM BR_Cliente_Cubo
 "@
 
@@ -412,7 +412,7 @@ $ResultData += @{
     nome         = $Row["Executivo"]
     cliente      = $Row["Cliente"]
     conglomerado = $Row["Conglomerado"]
-    flagProgAuto = $Row["FlagUtilizaLiberacaoAutomatica"] # MAPEA PARA ETAPA 4 (Geração de OV)
+    flagProgAuto = $Row["IntegracaoAutomaticaSAP"] # MAPEA PARA ETAPA 4 (Geração de OV)
 }
 
 $headers = @{ "x-api-key" = $apiKey; "Content-Type" = "application/json" }
