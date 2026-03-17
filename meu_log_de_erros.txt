@@ -1,0 +1,10 @@
+[2026-03-13T15:03:12.045Z] --- INICIANDO O SERVIDOR ---
+[2026-03-13T15:03:12.186Z] Ambiente (dev): false
+[2026-03-13T15:03:12.187Z] Porta definida pelo IIS: \\.\pipe\220dc627-436b-4cc9-85a4-09c655d3d1b0
+[2026-03-13T15:03:13.218Z] App Next.js preparada (build lido com sucesso).
+[2026-03-13T15:03:13.391Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\220dc627-436b-4cc9-85a4-09c655d3d1b0
+[2026-03-17T11:36:26.830Z] --- INICIANDO O SERVIDOR ---
+[2026-03-17T11:36:26.969Z] Ambiente (dev): false
+[2026-03-17T11:36:26.970Z] Porta definida pelo IIS: \\.\pipe\eb91ae1e-7ace-44a1-a75a-9551783ca9f0
+[2026-03-17T11:36:28.057Z] App Next.js preparada (build lido com sucesso).
+[2026-03-17T11:36:28.236Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\eb91ae1e-7ace-44a1-a75a-9551783ca9f0
