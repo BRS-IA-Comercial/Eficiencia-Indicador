@@ -2,6 +2,8 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  basePath: '/clientes', // <-- AQUI ESTÁ A MÁGICA
+  
   typescript: {
     ignoreBuildErrors: true,
   },

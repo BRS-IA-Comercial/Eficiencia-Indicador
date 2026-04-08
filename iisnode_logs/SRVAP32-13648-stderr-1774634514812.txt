@@ -1,0 +1,4 @@
+[2026-03-27T18:02:16.230Z]  @firebase/firestore: Firestore (11.9.0): GrpcConnection RPC 'Write' stream 0x553ec4a1 error. Code: 7 Message: 7 PERMISSION_DENIED: Missing or insufficient permissions.
+(node:13648) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2026-03-27T18:02:36.250Z]  @firebase/firestore: Firestore (11.9.0): GrpcConnection RPC 'Write' stream 0x553ec4a2 error. Code: 7 Message: 7 PERMISSION_DENIED: Missing or insufficient permissions.
