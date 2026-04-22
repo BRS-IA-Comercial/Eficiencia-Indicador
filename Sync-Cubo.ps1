@@ -92,9 +92,10 @@ SELECT DISTINCT
     ISNULL(T.pedidosComRuptura, 0) as pedidosComRuptura
 FROM BR_Cliente_Cubo C
 LEFT JOIN (
+    -- 👇 AJUSTE AQUI: Lê as janelas a partir do primeiro dia do mês atual para a frente (Mês Atual + Futuro) 👇
     SELECT ClienteID, MIN(CAST(FlagNaoLiberaAutomatico AS INT)) as FlagNaoLiberaAutomatico, COUNT(*) as QtdJanelas
     FROM Cubo_Janela_Corte
-    WHERE MONTH(DataJanelaCorte) = MONTH(GETDATE()) AND YEAR(DataJanelaCorte) = YEAR(GETDATE())
+    WHERE DataJanelaCorte >= DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0)
     GROUP BY ClienteID
 ) J ON C.ClienteID = J.ClienteID
 LEFT JOIN PedidosStats P ON C.ClienteID = P.ClienteID
@@ -147,7 +148,6 @@ $connection.Close()
 
 Write-Host "Dados extraídos com sucesso. Agrupando Itens de Ruptura..." -ForegroundColor Cyan
 
-# LÓGICA NOVA: Monta o Dicionário de Itens da Segunda Query (Tables[1])
 $DictTrocas = @{}
 foreach ($Row in $DataSet.Tables[1]) {
     $erp = $Row["CdExtCliente"].ToString().Trim()
@@ -167,7 +167,6 @@ foreach ($Row in $DataSet.Tables[1]) {
 
 $ResultData = @()
 
-# Processa os Dados Gerais da Primeira Query (Tables[0])
 foreach ($Row in $DataSet.Tables[0]) {
     $situacao = if ([DBNull]::Value.Equals($Row["Situacao"])) { "" } else { $Row["Situacao"].ToString().Trim() }
     $carteira = if ([DBNull]::Value.Equals($Row["NmCarteira"])) { "" } else { $Row["NmCarteira"].ToString().Trim() }
@@ -214,7 +213,6 @@ foreach ($Row in $DataSet.Tables[0]) {
         }
     }
 
-    # Atribui a lista de Itens Trocados deste cliente
     $topRup = if ($cdExtCliente -ne "" -and $DictTrocas.ContainsKey($cdExtCliente)) { $DictTrocas[$cdExtCliente] } else { @() }
 
     $ResultData += @{
