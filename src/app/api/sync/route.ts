@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     };
 
     for (const item of metrics) {
-      const rawId = String(item.cdExtCliente || item.cliente || "Desconhecido").trim();
+      const rawId = String(item.CdExtCliente || item.cdExtCliente || item.Cliente || item.cliente || "Desconhecido").trim();
       if (rawId === "Desconhecido") continue;
       const uniqueId = rawId.replace(/\//g, "-").replace(/\\/g, "-");
 
@@ -69,14 +69,14 @@ export async function POST(request: Request) {
             const valorAntigoBool = old[campo] === true || old[campo] === "SIM" || old[campo] === "1";
             if (valorAntigoBool !== valorNovoBool) {
               
-              const isSLA = item.utilizaJanela === "NAO";
+              const isSLA = item.UtilizaJanelaCorte === "NAO" || item.utilizaJanela === "NAO";
               const perfilAtendimento = isSLA ? "SLA" : "JANELA";
 
               batch.set(doc(collection(firestore, "automation_logs")), {
                 erpCode: uniqueId,
-                cliente: String(item.cliente || "Desconhecido"),
-                carteira: String(item.carteira || "Desconhecida"),
-                executivo: String(item.nome || "Não Informado"),
+                cliente: String(item.Cliente || item.cliente || "Desconhecido"),
+                carteira: String(item.NmCarteira || item.carteira || "Desconhecida"),
+                executivo: String(item.Executivo || item.nome || "Não Informado"),
                 perfil: perfilAtendimento,
                 campo: nomeAmigavel,
                 de: valorAntigoBool ? "Automático" : "Manual",
@@ -88,39 +88,46 @@ export async function POST(request: Request) {
             }
           };
 
-          checkChange('etapa2Ativo', 'Programação de Entrega', item.etapa2Ativo === true);
-          checkChange('flagGeraOVAuto', 'Geração de OV', item.flagGeraOVAuto === true);
-          checkChange('etapa3Ativo', 'Liberação de Pedidos', item.etapa3Ativo === true);
+          checkChange('etapa2Ativo', 'Programação de Entrega', (item.Etapa2Ativo === true || item.etapa2Ativo === true));
+          checkChange('flagGeraOVAuto', 'Geração de OV', (item.FlagGeraOVAuto === true || item.flagGeraOVAuto === true));
+          checkChange('etapa3Ativo', 'Liberação de Pedidos', (item.Etapa3Ativo === true || item.etapa3Ativo === true));
           await commitBatchIfNeeded();
         }
       } catch (histError) {
         console.error(`Erro ao gerar log para ${uniqueId}`, histError);
       }
 
-      // 👇 AS VARIÁVEIS NOVAS DA RUPTURA ESTÃO AQUI 👇
       batch.set(doc(firestore, 'cubo_metrics', uniqueId), {
-        executivo: String(item.nome || 'Não Informado'),
-        carteira: String(item.carteira || 'Sem Carteira'),
-        cliente: String(item.cliente || 'Sem Nome'),
-        conglomerado: String(item.conglomerado || item.cliente || 'Não Mapeado'),
-        flagGeraOVAuto: item.flagGeraOVAuto === true,
-        etapa2Ativo: item.etapa2Ativo === true,
-        etapa3Ativo: item.etapa3Ativo === true,
-        utilizaJanela: String(item.utilizaJanela || ''),
-        ordersCurrent: Number(item.ordersCurrent) || 0,
+        executivo: String(item.Executivo || item.nome || 'Não Informado'),
+        carteira: String(item.NmCarteira || item.carteira || 'Sem Carteira'),
+        cliente: String(item.Cliente || item.cliente || 'Sem Nome'),
+        conglomerado: String(item.Conglomerado || item.conglomerado || item.Cliente || item.cliente || 'Não Mapeado'),
         
-        trocasAuto: Number(item.trocasAuto) || 0,
-        trocasManual: Number(item.trocasManual) || 0,
-        avgRuptura3M: Number(item.avgRuptura3M) || 0,
-        topRupturas: item.topRupturas || [],
+        flagGeraOVAuto: item.FlagGeraOVAuto === true || item.flagGeraOVAuto === true,
+        etapa2Ativo: item.Etapa2Ativo === true || item.etapa2Ativo === true,
+        etapa3Ativo: item.Etapa3Ativo === true || item.etapa3Ativo === true,
+        
+        // 👇 CORREÇÃO: Lê a string real ou fallback
+        utilizaJanela: String(item.UtilizaJanelaCorte || item.utilizaJanela || "NAO"),
+        trocaAutomatica: String(item.TrocaAutomatica || item.trocaAutomatica || ""),
+        multiCdEnderecos: String(item.MultiCDEnderecos || item.multiCdEnderecos || "NAO"),
+        multiCdPedidos: String(item.MultiCDPedidos || item.multiCdPedidos || "NAO"),
+        naoLiberarPedidoSemOC: String(item.NaoLiberarPedidoSemOC || item.naoLiberarPedidoSemOC || "NAO"),
+        
+        ordersCurrent: Number(item.Orders_Current) || 0,
+        robCurrent: Number(item.ROB_Current) || 0,
+        
+        Historico_30D: item.Historico_30D || {},
+        Historico_60D: item.Historico_60D || {},
+        Historico_90D: item.Historico_90D || {},
 
-        multiCdEnderecos: String(item.multiCdEnderecos || ""),
-        multiCdPedidos: String(item.multiCdPedidos || ""),
-        naoLiberarPedidoSemOC: String(item.naoLiberarPedidoSemOC || ""),
-        robCurrent: Number(item.robCurrent) || 0,
-        avgOrders3M: Number(item.avgOrders3M) || 0,
-        avgRob3M: Number(item.avgRob3M) || 0,
-        isAtivo: item.isAtivo !== false,
+        trocasAuto: Number(item.Historico_30D?.trocasAuto) || 0,
+        trocasManual: Number(item.Historico_30D?.trocasManual) || 0,
+        avgRuptura3M: Number(item.Historico_30D?.pedidosComRuptura) || 0,
+        avgOrders3M: Number(item.Historico_30D?.Orders) || 0,
+        avgRob3M: Number(item.Historico_30D?.ROB) || 0,
+
+        isAtivo: item.Situacao === "Ativo" || item.isAtivo !== false,
         updatedAt: serverTimestamp()
       }, { merge: true });
       

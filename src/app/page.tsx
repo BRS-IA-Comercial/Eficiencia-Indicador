@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFirestore, useCollection, useFirebaseApp } from "@/firebase";
 import { collection, doc, writeBatch, setDoc, getDocs, serverTimestamp, query, orderBy, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -28,11 +29,15 @@ const formatName = (fullName: string) => {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 };
 
-// 👇 REGRA DE CORES CORRIGIDA AQUI 👇
-const getPctColorClass = (pct: number) => {
-  if (pct >= 90) return "text-secondary"; 
+const getPctColorClass = (pct: number, meta: number) => {
+  if (meta > 0) {
+    if (pct >= (meta * 0.95)) return "text-secondary"; 
+    if (pct >= (meta * 0.80)) return "text-amber-500"; 
+    return "text-gray-900 dark:text-white"; 
+  }
+  if (pct >= 95) return "text-secondary"; 
   if (pct >= 80) return "text-amber-500"; 
-  return "text-gray-900 dark:text-white"; // Preto para os demais    
+  return "text-gray-900 dark:text-white"; 
 };
 
 const ENTRADA_SISTEMAS: Record<string, boolean> = {
@@ -143,6 +148,8 @@ type ObsMode = 'view' | 'auth' | 'edit';
 
 export default function OrderFulfillmentDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [periodo, setPeriodo] = useState<"30D" | "60D" | "90D">("30D");
+
   const [isImporting, setIsImporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
@@ -208,10 +215,11 @@ export default function OrderFulfillmentDashboard() {
     if (!lastSyncDate) return "Carregando...";
     const end = lastSyncDate;
     const start = new Date(end);
-    start.setMonth(start.getMonth() - 3);
+    const dias = parseInt(periodo.replace("D", ""));
+    start.setDate(start.getDate() - dias);
     const formatDate = (d: Date) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
     return `${formatDate(start)} a ${formatDate(end)}`;
-  }, [lastSyncDate]);
+  }, [lastSyncDate, periodo]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -266,6 +274,20 @@ export default function OrderFulfillmentDashboard() {
       toast({ title: "Anotação Salva", description: "A observação foi gravada com sucesso." });
     } catch (error) {
       toast({ variant: "destructive", title: "Erro", description: "Falha ao salvar observação." });
+    }
+  };
+
+  const handleUpdateExcecao = async (conglomeradoId: string, erpCode: string, currentExcecoes: any, stepIndex: number, isException: boolean) => {
+    if (!conglomeradoId || conglomeradoId === "undefined" || !db) return;
+    const newExcecoes = { ...(currentExcecoes || {}), [stepIndex]: isException };
+    try {
+      const ref = doc(db, "erp_mappings", conglomeradoId);
+      await setDoc(ref, { 
+        erpExcecoes: { [erpCode]: newExcecoes } 
+      }, { merge: true }); 
+      toast({ title: "Exceção Atualizada", description: "Regra salva com sucesso. Os totais serão recalculados." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao salvar a exceção." });
     }
   };
 
@@ -423,7 +445,8 @@ export default function OrderFulfillmentDashboard() {
     const metricMap: Record<string, any> = {};
     
     let globalOrders3M = 0, globalRob3M = 0, globalOrdersCur = 0, globalRobCur = 0, globalErpsCount = 0;
-    const globalStages = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
+    
+    const globalStages = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
     
     cuboMetrics.forEach((m: any) => { metricMap[m.id] = m; });
 
@@ -447,7 +470,7 @@ export default function OrderFulfillmentDashboard() {
       if (!execMap[execName].portfolios[cartName]) execMap[execName].portfolios[cartName] = { name: cartName, conglomerates: [] };
 
       let congOrders3M = 0, congRob3M = 0, congOrdersCur = 0, congRobCur = 0, congErpsCount = 0;
-      const stageStatsCong = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
+      const stageStatsCong = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
       const systemWeights: Record<string, number> = {};
       const erps: any[] = [];
 
@@ -473,22 +496,31 @@ export default function OrderFulfillmentDashboard() {
         globalErpsCount++;
 
         let ord3M = 0, rob3M = 0, ordCur = 0, robCur = 0, rup3M = 0;
-        let stagesForStats = Array(6).fill(null).map(() => ({ totalOrders: 0, activeOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
+        let stagesForStats = Array(6).fill(null).map(() => ({ totalOrders: 0, activeOrders: 0, metaOrders: 0, rupturedOrders: 0, baseOrders: 0, isException: false }));
 
         const erpOverrideKey = `${docId}_${code}`;
         const erpSistemaDb = m.erpSistemasOverrides?.[code] || "";
         const erpSistemaProprio = sistemasOverrides[erpOverrideKey] !== undefined ? sistemasOverrides[erpOverrideKey] : erpSistemaDb;
         const erpObservacaoDb = m.erpObservacoes?.[code] || "";
+        const erpExcecoesDb = m.erpExcecoes?.[code] || {}; 
 
         const sistemaFinal = erpSistemaProprio ? erpSistemaProprio : sistemaConglomerado;
         const isEtapa1Auto = sistemaFinal ? ENTRADA_SISTEMAS[sistemaFinal] || false : false;
 
+        const hist = metric?.[`Historico_${periodo}`] || {
+            Orders: metric?.avgOrders3M || 0,
+            ROB: metric?.avgRob3M || 0,
+            trocasAuto: metric?.trocasAuto || 0,
+            trocasManual: metric?.trocasManual || 0,
+            pedidosComRuptura: metric?.avgRuptura3M || 0
+        };
+
         if (isAtivo) {
-          ord3M = metric?.avgOrders3M || 0; 
-          rob3M = metric?.avgRob3M || 0;
+          ord3M = hist.Orders || 0; 
+          rob3M = hist.ROB || 0;
           ordCur = metric?.ordersCurrent || 0; 
           robCur = metric?.robCurrent || 0;
-          rup3M = metric?.avgRuptura3M || 0; 
+          rup3M = hist.pedidosComRuptura || 0; 
 
           congOrders3M += ord3M; congRob3M += rob3M; congOrdersCur += ordCur; congRobCur += robCur;
           globalOrders3M += ord3M; globalRob3M += rob3M; globalOrdersCur += ordCur; globalRobCur += robCur;
@@ -497,8 +529,8 @@ export default function OrderFulfillmentDashboard() {
             systemWeights[sistemaFinal] = (systemWeights[sistemaFinal] || 0) + ord3M;
           }
 
-          const tAuto = metric?.trocasAuto || 0;
-          const tManual = metric?.trocasManual || 0;
+          const tAuto = hist.trocasAuto || 0;
+          const tManual = hist.trocasManual || 0;
           const tTotal = tAuto + tManual;
           const isEtapa2Auto = tTotal > 0 && (tAuto >= tManual); 
 
@@ -512,8 +544,11 @@ export default function OrderFulfillmentDashboard() {
           ];
 
           stagesActive.forEach((isActive, i) => {
-            stageStatsCong[i].total += 1;
-            globalStages[i].total += 1;
+            // 👇 NOVO: Lê a exceção manual, e se for a Etapa 2 (i === 1) e o SQL disser que é exceção, força ser true.
+            let isException = erpExcecoesDb[i] === true;
+            if (i === 1 && metric?.trocaAutomatica === "NAO") {
+              isException = true; 
+            }
 
             let tOrd = ord3M;
             let aOrd = isActive ? ord3M : 0;
@@ -525,7 +560,7 @@ export default function OrderFulfillmentDashboard() {
               rupOrd = rup3M; 
             }
 
-            stagesForStats[i] = { totalOrders: tOrd, activeOrders: aOrd, rupturedOrders: rupOrd, baseOrders: ord3M };
+            let mOrd = isException ? 0 : tOrd; 
 
             stageStatsCong[i].totalOrders += tOrd;
             globalStages[i].totalOrders += tOrd;
@@ -533,23 +568,29 @@ export default function OrderFulfillmentDashboard() {
             stageStatsCong[i].activeOrders += aOrd;
             globalStages[i].activeOrders += aOrd;
             
+            stageStatsCong[i].metaOrders += mOrd;
+            globalStages[i].metaOrders += mOrd;
+
             stageStatsCong[i].rupturedOrders += rupOrd;
             globalStages[i].rupturedOrders += rupOrd;
             
             stageStatsCong[i].baseOrders += ord3M;
             globalStages[i].baseOrders += ord3M;
 
-            if (isActive) {
+            if (!isException && isActive) {
               stageStatsCong[i].active += 1;
               globalStages[i].active += 1;
             }
+
+            stagesForStats[i] = { totalOrders: tOrd, activeOrders: aOrd, metaOrders: mOrd, rupturedOrders: rupOrd, baseOrders: ord3M, isException: isException };
           });
         }
         
         erps.push({ 
-          code, name: code, metric, isAtivo, 
+          code, name: code, metric: { ...metric, avgOrders3M: ord3M, avgRob3M: rob3M, avgRuptura3M: rup3M, trocasAuto: hist.trocasAuto, trocasManual: hist.trocasManual }, isAtivo, 
           sistemaFinal, erpSistemaProprio, isEtapa1Auto, 
           observacao: erpObservacaoDb,
+          excecoes: erpExcecoesDb,
           stats: { avgOrders3M: ord3M, avgRob3M: rob3M, stages: stagesForStats } 
         });
       });
@@ -577,11 +618,11 @@ export default function OrderFulfillmentDashboard() {
 
     const executives = Object.values(execMap).map(exec => {
       let execOrders3M = 0, execRob3M = 0, execOrdersCur = 0, execRobCur = 0, execTotalErps = 0;
-      const stageStatsExec = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
+      const stageStatsExec = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
 
       const portfolios = Object.values(exec.portfolios).map(port => {
         let portOrders3M = 0, portRob3M = 0, portOrdersCur = 0, portRobCur = 0, portTotalErps = 0;
-        const stageStatsPort = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
+        const stageStatsPort = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
 
         port.conglomerates.forEach(cong => {
           portOrders3M += cong.stats.avgOrders3M; portRob3M += cong.stats.avgRob3M;
@@ -594,12 +635,18 @@ export default function OrderFulfillmentDashboard() {
 
           cong.stats.stages.forEach((stg: any, i: number) => {
             stageStatsPort[i].total += stg.total; stageStatsPort[i].active += stg.active;
-            stageStatsPort[i].totalOrders += stg.totalOrders; stageStatsPort[i].activeOrders += stg.activeOrders;
-            stageStatsPort[i].rupturedOrders += stg.rupturedOrders; stageStatsPort[i].baseOrders += stg.baseOrders;
+            stageStatsPort[i].totalOrders += stg.totalOrders; 
+            stageStatsPort[i].activeOrders += stg.activeOrders;
+            stageStatsPort[i].metaOrders += stg.metaOrders;
+            stageStatsPort[i].rupturedOrders += stg.rupturedOrders; 
+            stageStatsPort[i].baseOrders += stg.baseOrders;
 
             stageStatsExec[i].total += stg.total; stageStatsExec[i].active += stg.active;
-            stageStatsExec[i].totalOrders += stg.totalOrders; stageStatsExec[i].activeOrders += stg.activeOrders;
-            stageStatsExec[i].rupturedOrders += stg.rupturedOrders; stageStatsExec[i].baseOrders += stg.baseOrders;
+            stageStatsExec[i].totalOrders += stg.totalOrders; 
+            stageStatsExec[i].activeOrders += stg.activeOrders;
+            stageStatsExec[i].metaOrders += stg.metaOrders;
+            stageStatsExec[i].rupturedOrders += stg.rupturedOrders; 
+            stageStatsExec[i].baseOrders += stg.baseOrders;
           });
         });
 
@@ -618,7 +665,7 @@ export default function OrderFulfillmentDashboard() {
     });
 
     return { executives: sortNodes(executives), globalStats: { avgOrders3M: globalOrders3M, avgRob3M: globalRob3M, ordersCurrent: globalOrdersCur, robCurrent: globalRobCur, totalErps: globalErpsCount, stages: globalStages } };
-  }, [cuboMetrics, erpMappings, filterExecutivos, filterCarteiras, filterClientes, filterMultiCD, filterRegraOC, filterPerfil, sortConfig, sistemasOverrides]);
+  }, [cuboMetrics, erpMappings, filterExecutivos, filterCarteiras, filterClientes, filterMultiCD, filterRegraOC, filterPerfil, sortConfig, sistemasOverrides, periodo]);
 
   const rupturasRanking = useMemo(() => {
     if (!groupedData) return [];
@@ -629,22 +676,33 @@ export default function OrderFulfillmentDashboard() {
       exec.portfolios.forEach((port: any) => {
         port.conglomerates.forEach((cong: any) => {
           cong.erps.forEach((erp: any) => {
-            const tManual = erp.metric?.trocasManual || 0;
-            const tAuto = erp.metric?.trocasAuto || 0;
+            // 👇 NOVO: Considera também a exceção do banco de dados para esconder do ranking
+            const isExceptionEtapa2 = erp.excecoes?.[1] === true || erp.metric?.trocaAutomatica === "NAO"; 
+            
+            const hist = erp.metric?.[`Historico_${periodo}`] || {
+                Orders: erp.metric?.avgOrders3M || 0,
+                trocasAuto: erp.metric?.trocasAuto || 0,
+                trocasManual: erp.metric?.trocasManual || 0,
+                pedidosComRuptura: erp.metric?.avgRuptura3M || 0
+            };
+            
+            const tManual = hist.trocasManual || 0;
+            const tAuto = hist.trocasAuto || 0;
             const tTotal = tManual + tAuto;
-            const pedidosRup = erp.metric?.avgRuptura3M || 0;
+            const pedidosRup = hist.pedidosComRuptura || 0;
+            const pedidosTotal = hist.Orders || 0;
 
-            if (tManual > 0 || pedidosRup > 0) {
+            if ((tManual > 0 || pedidosRup > 0) && !isExceptionEtapa2) {
               allErps.push({
                 executivo: exec.name,
                 cliente: cong.name,
                 erpCode: erp.code,
-                pedidosTotal: erp.stats.avgOrders3M,
+                pedidosTotal: pedidosTotal,
                 pedidosRuptura: pedidosRup,
                 trocasAuto: tAuto,
                 trocasManual: tManual,
                 trocasTotal: tTotal,
-                pctRuptura: erp.stats.avgOrders3M > 0 ? Math.round((pedidosRup / erp.stats.avgOrders3M) * 100) : 0,
+                pctRuptura: pedidosTotal > 0 ? Math.round((pedidosRup / pedidosTotal) * 100) : 0,
                 pctManual: tTotal > 0 ? Math.round((tManual / tTotal) * 100) : 0
               });
             }
@@ -654,7 +712,7 @@ export default function OrderFulfillmentDashboard() {
     });
 
     return allErps.sort((a, b) => b.trocasManual - a.trocasManual);
-  }, [groupedData]);
+  }, [groupedData, periodo]);
 
   const hasActiveFilter = filterExecutivos.length > 0 || filterCarteiras.length > 0 || filterClientes.length > 0 || filterMultiCD.length > 0 || filterRegraOC.length > 0 || filterPerfil.length > 0;
   const activeFilterCount = filterExecutivos.length + filterCarteiras.length + filterClientes.length + filterMultiCD.length + filterRegraOC.length + filterPerfil.length;
@@ -723,7 +781,7 @@ export default function OrderFulfillmentDashboard() {
 
         const conglomeradoOriginal = String(row[2] || "").trim(); 
         const erpMaeRaw = row[4];                                 
-        const sistemaRaw = String(row[5] || "").trim();           
+        const sistemaRaw = String(row[5] || "").trim();            
 
         if (conglomeradoOriginal && erpMaeRaw) {
           const idSeguro = conglomeradoOriginal.replace(/\//g, "-").replace(/\\/g, "-");
@@ -839,7 +897,8 @@ export default function OrderFulfillmentDashboard() {
     obsPassword, setObsPassword,
     obsError, setObsError,
     isConfigAuthenticated, setIsConfigAuthenticated,
-    handleUpdateObservacao
+    handleUpdateObservacao,
+    handleUpdateExcecao 
   };
 
   return (
@@ -1032,11 +1091,11 @@ export default function OrderFulfillmentDashboard() {
                     </div>
                     <div className="bg-gray-100 border-r flex flex-col items-center justify-center p-2 cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => requestSort('pedidos')}>
                       <div className="font-bold text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1 w-full">Pedidos {getSortIcon('pedidos')}</div>
-                      <span className="text-[8px] text-muted-foreground/70 whitespace-nowrap">(Méd 3M/Atual)</span>
+                      <span className="text-[8px] text-muted-foreground/70 whitespace-nowrap">({periodo}/Atual)</span>
                     </div>
                     <div className="bg-gray-100 border-r flex flex-col items-center justify-center p-2 cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => requestSort('rob')}>
                       <div className="font-bold text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1 w-full">ROB {getSortIcon('rob')}</div>
-                      <span className="text-[8px] text-muted-foreground/70 whitespace-nowrap">(Méd 3M/Atual)</span>
+                      <span className="text-[8px] text-muted-foreground/70 whitespace-nowrap">({periodo}/Atual)</span>
                     </div>
                   </>
                 )}
@@ -1064,9 +1123,27 @@ export default function OrderFulfillmentDashboard() {
                       <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1 border-l border-gray-600 pl-4" title="Última sincronização do banco de dados (Cubo)">
                         <Clock className="h-3 w-3" /> Atualizado em: {new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(lastSyncDate)}
                       </span>
-                      <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1 border-l border-gray-600 pl-4" title="Período base para cálculo de Pedidos, ROB e Rupturas">
-                        <Calendar className="h-3 w-3" /> Período Analisado: {dateRangeText}
-                      </span>
+                      <div className="flex items-center border-l border-gray-600 pl-2 ml-1">
+                        <Select value={periodo} onValueChange={(v: "30D" | "60D" | "90D") => setPeriodo(v)}>
+                          <SelectTrigger className="h-7 border-none bg-transparent hover:bg-white/5 focus:ring-0 focus:ring-offset-0 px-2 shadow-none transition-colors rounded group gap-1.5 outline-none cursor-pointer">
+                            <div className="flex items-center gap-1.5 text-[10px]">
+                              <Calendar className="h-3 w-3 text-gray-400 group-hover:text-gray-300 transition-colors" />
+                              <span className="text-gray-400 font-medium group-hover:text-gray-300 transition-colors">Período Analisado:</span>
+                              <span className="text-white font-bold ml-0.5">
+                                <SelectValue />
+                              </span>
+                            </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="30D">Últimos 30 Dias</SelectItem>
+                            <SelectItem value="60D">Últimos 60 Dias</SelectItem>
+                            <SelectItem value="90D">Últimos 90 Dias</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <span className="text-[10px] text-gray-400 font-medium hidden sm:inline opacity-70 ml-1">
+                          ({dateRangeText})
+                        </span>
+                      </div>
                     </>
                   )}
                 </div>
@@ -1108,17 +1185,19 @@ export default function OrderFulfillmentDashboard() {
                     )}
 
                     {globalStats.stages.map((stage: any, i: number) => {
-                      const simplePct = Math.round((stage.active / (stage.total || 1)) * 100);
-                      const weightedPct = Math.round((stage.activeOrders / (stage.totalOrders || 1)) * 100);
+                      const weightedPct = stage.totalOrders > 0 ? Math.round((stage.activeOrders / stage.totalOrders) * 100) : 0;
+                      const metaPct = stage.totalOrders > 0 ? Math.round((stage.metaOrders / stage.totalOrders) * 100) : 0;
+                      
                       return (
                         <div key={i} className="p-2 flex flex-col items-center justify-center border-r border-gray-300/50 last:border-r-0">
-                          <span className={`text-xs font-black ${getPctColorClass(weightedPct)}`}>{weightedPct}%</span>
+                          <span className={`text-xs font-black ${getPctColorClass(weightedPct, metaPct)}`}>{weightedPct}%</span>
                           {i === 1 ? (
-                            <span className="text-[9px] text-muted-foreground font-bold">
-                              {stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura
-                            </span>
+                            <div className="flex flex-col items-center mt-0.5">
+                              <span className="text-[8px] text-muted-foreground/60 font-medium">Meta: {metaPct}%</span>
+                              <span className="text-[8px] text-muted-foreground font-semibold">{stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura</span>
+                            </div>
                           ) : (
-                            <span className="text-[9px] text-muted-foreground font-bold">{simplePct}% por ERP</span>
+                            <span className="text-[8px] text-muted-foreground/60 font-medium mt-0.5">Meta: {metaPct}%</span>
                           )}
                         </div>
                       );
@@ -1167,17 +1246,18 @@ export default function OrderFulfillmentDashboard() {
                           )}
 
                           {exec.stats.stages.map((stage: any, i: number) => {
-                            const simplePct = Math.round((stage.active / (stage.total || 1)) * 100);
-                            const weightedPct = Math.round((stage.activeOrders / (stage.totalOrders || 1)) * 100);
+                            const weightedPct = stage.totalOrders > 0 ? Math.round((stage.activeOrders / stage.totalOrders) * 100) : 0;
+                            const metaPct = stage.totalOrders > 0 ? Math.round((stage.metaOrders / stage.totalOrders) * 100) : 0;
                             return (
                               <div key={i} className="p-2 flex flex-col items-center justify-center border-r border-gray-200">
-                                <span className={`text-xs font-bold ${getPctColorClass(weightedPct)}`}>{weightedPct}%</span>
+                                <span className={`text-xs font-bold ${getPctColorClass(weightedPct, metaPct)}`}>{weightedPct}%</span>
                                 {i === 1 ? (
-                                  <span className="text-[9px] text-muted-foreground/70 font-semibold">
-                                    {stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura
-                                  </span>
+                                  <div className="flex flex-col items-center mt-0.5">
+                                    <span className="text-[8px] text-muted-foreground/60 font-medium">Meta: {metaPct}%</span>
+                                    <span className="text-[8px] text-muted-foreground/70 font-semibold">{stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura</span>
+                                  </div>
                                 ) : (
-                                  <span className="text-[9px] text-muted-foreground/70 font-semibold">{simplePct}% por ERP</span>
+                                  <span className="text-[8px] text-muted-foreground/60 font-medium mt-0.5">Meta: {metaPct}%</span>
                                 )}
                               </div>
                             );
@@ -1222,17 +1302,18 @@ export default function OrderFulfillmentDashboard() {
                                     )}
 
                                     {port.stats.stages.map((stage: any, i: number) => {
-                                      const simplePct = Math.round((stage.active / (stage.total || 1)) * 100);
-                                      const weightedPct = Math.round((stage.activeOrders / (stage.totalOrders || 1)) * 100);
+                                      const weightedPct = stage.totalOrders > 0 ? Math.round((stage.activeOrders / stage.totalOrders) * 100) : 0;
+                                      const metaPct = stage.totalOrders > 0 ? Math.round((stage.metaOrders / stage.totalOrders) * 100) : 0;
                                       return (
                                         <div key={i} className="p-2 flex flex-col items-center justify-center border-r border-gray-100">
-                                          <span className={`text-xs font-bold ${getPctColorClass(weightedPct)}`}>{weightedPct}%</span>
+                                          <span className={`text-xs font-bold ${getPctColorClass(weightedPct, metaPct)}`}>{weightedPct}%</span>
                                           {i === 1 ? (
-                                            <span className="text-[9px] text-muted-foreground/70 font-semibold">
-                                              {stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura
-                                            </span>
+                                            <div className="flex flex-col items-center mt-0.5">
+                                              <span className="text-[8px] text-muted-foreground/60 font-medium">Meta: {metaPct}%</span>
+                                              <span className="text-[8px] text-muted-foreground/70 font-semibold">{stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura</span>
+                                            </div>
                                           ) : (
-                                            <span className="text-[9px] text-muted-foreground/70 font-semibold">{simplePct}% por ERP</span>
+                                            <span className="text-[8px] text-muted-foreground/60 font-medium mt-0.5">Meta: {metaPct}%</span>
                                           )}
                                         </div>
                                       );
@@ -1270,7 +1351,7 @@ export default function OrderFulfillmentDashboard() {
                   <Card className="shadow-sm border-l-4 border-l-amber-500">
                     <CardContent className="p-4 flex items-center justify-between">
                       <div>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Trabalho Manual (3M)</p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Trabalho Manual ({periodo})</p>
                         <h3 className="text-2xl font-black text-gray-800 mt-1">{formatNumber(rupturasRanking.reduce((acc, curr) => acc + curr.trocasManual, 0))} <span className="text-sm font-medium text-gray-500">trocas</span></h3>
                       </div>
                       <div className="p-3 bg-amber-50 rounded-full"><Activity className="h-5 w-5 text-amber-500" /></div>
@@ -1280,7 +1361,7 @@ export default function OrderFulfillmentDashboard() {
                   <Card className="shadow-sm border-l-4 border-l-primary">
                     <CardContent className="p-4 flex items-center justify-between">
                       <div>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Pedidos Afetados (3M)</p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Pedidos Afetados ({periodo})</p>
                         <h3 className="text-2xl font-black text-gray-800 mt-1">{formatNumber(rupturasRanking.reduce((acc, curr) => acc + curr.pedidosRuptura, 0))} <span className="text-sm font-medium text-gray-500">pedidos</span></h3>
                       </div>
                       <div className="p-3 bg-primary/10 rounded-full"><AlertTriangle className="h-5 w-5 text-primary" /></div>
@@ -1312,7 +1393,7 @@ export default function OrderFulfillmentDashboard() {
                       <CardTitle className="text-xl flex items-center gap-2 text-gray-800">
                         <TrendingDown className="h-6 w-6 text-primary" /> Ranking de Ofensores (Esforço Manual)
                       </CardTitle>
-                      <p className="text-xs text-muted-foreground mt-1">Clientes ordenados pela quantidade de trocas feitas manualmente nos últimos 3 meses.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Clientes ordenados pela quantidade de trocas feitas manualmente nos últimos {periodo.replace('D', ' dias')}.</p>
                     </div>
                   </CardHeader>
 
@@ -1323,7 +1404,7 @@ export default function OrderFulfillmentDashboard() {
                           <tr>
                             <th className="px-6 py-3 font-bold">Hierarquia</th>
                             <th className="px-6 py-3 font-bold">Cliente</th>
-                            <th className="px-6 py-3 font-bold text-center">Vol. Pedidos (3M)</th>
+                            <th className="px-6 py-3 font-bold text-center">Vol. Pedidos ({periodo})</th>
                             <th className="px-6 py-3 font-bold text-center">Ped. c/ Ruptura</th>
                             <th className="px-6 py-3 font-bold text-center text-primary">Trocas Sistema</th>
                             <th className="px-6 py-3 font-bold text-center text-amber-600 bg-amber-50/50">Trocas Manuais</th>
@@ -1335,7 +1416,7 @@ export default function OrderFulfillmentDashboard() {
                             <tr>
                               <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
                                 <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                                Nenhuma ruptura encontrada para os filtros atuais.
+                                Nenhuma ruptura encontrada para os filtros atuais ou as rupturas estão marcadas como Exceção.
                               </td>
                             </tr>
                           ) : (
@@ -1627,9 +1708,6 @@ export default function OrderFulfillmentDashboard() {
             )}
           </TabsContent>
 
-          {/* ========================================================= */}
-          {/* NOVA ABA: DOCUMENTAÇÃO E GUIA DE USO */}
-          {/* ========================================================= */}
           <TabsContent value="documentacao" className="mt-0">
             <div className="space-y-6 animate-in fade-in duration-500 pb-12">
               
@@ -1664,15 +1742,15 @@ export default function OrderFulfillmentDashboard() {
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-3 rounded-full bg-secondary shrink-0"></div>
-                      <p className="text-sm"><strong className="text-secondary">Verde (90% a 100%):</strong> Operação excelente. A vasta maioria do fluxo roda sem intervenção humana.</p>
+                      <p className="text-sm"><strong className="text-secondary">Verde (&ge; 95% da Meta):</strong> Operação excelente. A automação está a cumprir com a meta expectável para a carteira.</p>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-3 rounded-full bg-amber-500 shrink-0"></div>
-                      <p className="text-sm"><strong className="text-amber-600">Amarelo (80% a 89%):</strong> Atenção. O nível de automação está abaixo do ideal e exige monitorização.</p>
+                      <p className="text-sm"><strong className="text-amber-600">Amarelo (&ge; 80% da Meta):</strong> Atenção. O nível de automação está marginalmente abaixo do ideal e exige monitorização.</p>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-3 rounded-full bg-gray-900 shrink-0"></div>
-                      <p className="text-sm"><strong className="text-gray-900">Preto (Abaixo de 80%):</strong> Crítico. O esforço manual está muito alto e requer um plano de ação imediato.</p>
+                      <p className="text-sm"><strong className="text-gray-900">Preto (Abaixo de 80% da Meta):</strong> Crítico. O esforço manual está muito alto em relação ao possível e requer um plano de ação imediato.</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -1685,13 +1763,13 @@ export default function OrderFulfillmentDashboard() {
                   <CardContent className="p-6">
                     <ul className="space-y-3 text-sm text-gray-700 list-disc ml-4">
                       <li>
-                        A coluna de <strong>Pedidos</strong> exibe o número grande correspondente à Média Mensal dos <strong className="text-black">Últimos 3 Meses</strong>. O número menor abaixo é a quantidade faturada no Mês Atual em curso.
+                        A coluna de <strong>Pedidos</strong> exibe o número grande correspondente à Média Mensal dos <strong className="text-black">Últimos 30 Dias</strong>. O número menor abaixo é a quantidade faturada no Mês Atual em curso.
                       </li>
                       <li>
-                        A coluna de <strong>ROB</strong> segue a mesma lógica matemática: Média dos últimos 3 meses no topo, Mês atual embaixo.
+                        A coluna de <strong>ROB</strong> segue a mesma lógica matemática: Média dos últimos 30 dias no topo, Mês atual embaixo.
                       </li>
                       <li>
-                        As <strong>Trocas e Rupturas (Etapa 2)</strong> contam as ocorrências exatas registadas também nos últimos 3 meses, para manter o peso alinhado com a média de pedidos.
+                        As <strong>Trocas e Rupturas (Etapa 2)</strong> contam as ocorrências exatas registadas também nos últimos 30 dias, para manter o peso alinhado com a média de pedidos.
                       </li>
                     </ul>
                   </CardContent>
@@ -1722,7 +1800,7 @@ export default function OrderFulfillmentDashboard() {
                         <h4 className="font-bold text-gray-800">Tratamento de Rupturas</h4>
                       </div>
                       <div className="text-sm text-gray-600 space-y-2">
-                        <p><strong>A Matemática (% AUTO):</strong> Divide as trocas feitas pelo "Sistema" pelo total de trocas de itens ocorridas nos últimos 3 meses (Sistema + Manual). Exemplo: 80% AUTO significa que a cada 10 itens trocados na cotação, 8 foram resolvidos por automação.</p>
+                        <p><strong>A Matemática (% AUTO):</strong> Divide as trocas feitas pelo "Sistema" pelo total de trocas de itens ocorridas nos últimos 30 dias (Sistema + Manual). Exemplo: 80% AUTO significa que a cada 10 itens trocados na cotação, 8 foram resolvidos por automação.</p>
                         <p><strong>O Problema Base (% COM RUPTURA):</strong> É o número pequeno cinza. Ele divide a quantidade de pedidos que sofreram ruptura pela média total de pedidos do cliente. Serve para indicar se o problema afeta a base toda ou apenas uma fatia pequena.</p>
                       </div>
                     </div>
@@ -1823,12 +1901,12 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
         )}
 
         {cong.stats.stages.map((stage: any, i: number) => {
-          const simplePct = Math.round((stage.active / (stage.total || 1)) * 100);
-          const weightedPct = Math.round((stage.activeOrders / (stage.totalOrders || 1)) * 100);
+          const weightedPct = stage.totalOrders > 0 ? Math.round((stage.activeOrders / stage.totalOrders) * 100) : 0;
+          const metaPct = stage.totalOrders > 0 ? Math.round((stage.metaOrders / stage.totalOrders) * 100) : 0;
           
           return (
             <div key={i} className="p-2 flex flex-col items-center justify-center border-r border-gray-200 relative group">
-              <span className={`text-[11px] font-bold ${getPctColorClass(weightedPct)}`}>{weightedPct}%</span>
+              <span className={`text-[11px] font-bold ${getPctColorClass(weightedPct, metaPct)}`}>{weightedPct}%</span>
               
               {i === 0 ? (
                 <select
@@ -1846,11 +1924,12 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                   ))}
                 </select>
               ) : i === 1 ? (
-                <span className="text-[9px] text-muted-foreground/70 font-semibold">
-                  {stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura
-                </span>
+                <div className="flex flex-col items-center mt-0.5">
+                  <span className="text-[8px] text-muted-foreground/60 font-medium">Meta: {metaPct}%</span>
+                  <span className="text-[8px] text-muted-foreground/70 font-semibold">{stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura</span>
+                </div>
               ) : (
-                <span className="text-[8px] text-muted-foreground/70 font-semibold">{simplePct}% por ERP</span>
+                <span className="text-[8px] text-muted-foreground/60 font-medium mt-0.5">Meta: {metaPct}%</span>
               )}
             </div>
           );
@@ -1938,6 +2017,9 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                   ) : (
                     <>
                       {[1, 2, 3, 4, 5, 6].map((step) => {
+                        const i = step - 1;
+                        const isException = erp.stats.stages[i].isException;
+
                         let isStepActive = false;
                         let titleText = "MANUAL";
                         let percentage = 0;
@@ -1984,41 +2066,42 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                           titleText = statusText;
                         }
 
-                        // 👇 REGRA DE CORES CORRIGIDA NA BARRA 👇
-                        let barColor = 'bg-gray-800 dark:bg-gray-200'; // PRETO/ESCURO DEFAULT
-                        if (percentage >= 90) barColor = 'bg-secondary';
+                        let barColor = 'bg-gray-800 dark:bg-gray-200'; 
+                        if (percentage >= 95) barColor = 'bg-secondary';
                         else if (percentage >= 80) barColor = 'bg-amber-500';
                         
                         return (
                           <div key={step} className="p-3 flex items-center justify-center border-r">
-                            <div className="flex flex-col items-center justify-center w-full max-w-[85px]">
-                              
-                              <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1.5" title={titleText}>
-                                <div className={`${barColor} h-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
+                            {isException ? (
+                              <Badge variant="outline" className="text-[9px] font-bold text-gray-400 bg-gray-50/80 border-dashed" title="Ignorado no cálculo da meta geral">N/A (Exceção)</Badge>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center w-full max-w-[85px]">
+                                <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1.5" title={titleText}>
+                                  <div className={`${barColor} h-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
+                                </div>
+
+                                {step === 1 ? (
+                                  <select
+                                    onClick={(e) => e.stopPropagation()} 
+                                    onChange={(e) => handleUpdateErpSistema(cong.id, erp.code, e.target.value)} 
+                                    value={erp.erpSistemaProprio || ""}
+                                    className={`text-[8px] font-bold ${percentage >= 95 ? 'text-secondary' : percentage >= 80 ? 'text-amber-500' : 'text-gray-800'} w-full bg-transparent outline-none cursor-pointer hover:text-primary transition-colors border-b border-dashed border-transparent hover:border-primary text-center appearance-none truncate`}
+                                    title={`Atual: ${titleText} (${statusText})`}
+                                  >
+                                    <option value="" className="text-gray-400 font-normal">
+                                      {cong.sistemaEntrada ? cong.sistemaEntrada : 'Herdar do Pai'}
+                                    </option>
+                                    {Object.keys(ENTRADA_SISTEMAS).map(sys => (
+                                      <option key={sys} value={sys} className="text-gray-800 font-normal">{sys}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span className={`text-[8px] font-bold ${percentage >= 95 ? 'text-secondary' : percentage >= 80 ? 'text-amber-500' : 'text-gray-800'} transition-colors text-center w-full truncate`} title={titleText}>
+                                    {statusText}
+                                  </span>
+                                )}
                               </div>
-
-                              {step === 1 ? (
-                                <select
-                                  onClick={(e) => e.stopPropagation()} 
-                                  onChange={(e) => handleUpdateErpSistema(cong.id, erp.code, e.target.value)} 
-                                  value={erp.erpSistemaProprio || ""}
-                                  className={`text-[8px] font-bold ${percentage >= 90 ? 'text-secondary' : percentage >= 80 ? 'text-amber-500' : 'text-gray-800'} w-full bg-transparent outline-none cursor-pointer hover:text-primary transition-colors border-b border-dashed border-transparent hover:border-primary text-center appearance-none truncate`}
-                                  title={`Atual: ${titleText} (${statusText})`}
-                                >
-                                  <option value="" className="text-gray-400 font-normal">
-                                    {cong.sistemaEntrada ? cong.sistemaEntrada : 'Herdar do Pai'}
-                                  </option>
-                                  {Object.keys(ENTRADA_SISTEMAS).map(sys => (
-                                    <option key={sys} value={sys} className="text-gray-800 font-normal">{sys}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <span className={`text-[8px] font-bold ${percentage >= 90 ? 'text-secondary' : percentage >= 80 ? 'text-amber-500' : 'text-gray-800'} transition-colors text-center w-full truncate`} title={titleText}>
-                                  {statusText}
-                                </span>
-                              )}
-
-                            </div>
+                            )}
                           </div>
                         );
                       })}
@@ -2026,8 +2109,8 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                       <div className="p-2 flex items-center justify-center border-r last:border-r-0 bg-gray-50/10">
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleToggleObs(erp.code); }}
-                          className={`p-1.5 rounded transition-colors ${hasObs ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-gray-200 text-gray-400'}`}
-                          title={hasObs ? "Ver Observações" : "Adicionar Observação"}
+                          className={`p-1.5 rounded transition-colors ${hasObs || Object.keys(erp.excecoes || {}).some(k => erp.excecoes[k] === true) || erp.metric?.trocaAutomatica === "NAO" ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-gray-200 text-gray-400'}`}
+                          title="Anotações e Exceções de Metas"
                         >
                           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </button>
@@ -2043,7 +2126,7 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                       <div className="w-full max-w-3xl mx-auto flex flex-col gap-3">
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                            <MessageSquare className="h-4 w-4 text-primary"/> Anotações do Cliente ({erp.code})
+                            <MessageSquare className="h-4 w-4 text-primary"/> Anotações e Exceções ({erp.code})
                           </span>
                           <div className="flex gap-2">
                             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => handleAction(erp.code, 'edit')}>
@@ -2054,7 +2137,18 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                             </Button>
                           </div>
                         </div>
-                        <div className="p-4 bg-white border border-gray-200 shadow-sm rounded-md text-sm text-gray-700 min-h-[60px] whitespace-pre-wrap leading-relaxed">
+
+                        {(Object.keys(erp.excecoes || {}).some(k => erp.excecoes[k] === true) || erp.metric?.trocaAutomatica === "NAO") ? (
+                          <div className="flex gap-2 flex-wrap mt-1">
+                            <span className="text-xs font-bold text-gray-500 mr-2 flex items-center"><Filter className="h-3 w-3 mr-1"/> Ignorado nas Metas:</span>
+                            {["Entrada", "Rupturas", "Programação", "Ger. OV", "Liberação", "Ocorrências"].map((lbl, idx) => {
+                              const isExc = erp.excecoes?.[idx] || (idx === 1 && erp.metric?.trocaAutomatica === "NAO");
+                              return isExc ? <Badge key={idx} variant="outline" className="text-[9px] bg-red-50 text-red-600 border-red-200">{lbl}</Badge> : null;
+                            })}
+                          </div>
+                        ) : null}
+
+                        <div className="p-4 bg-white border border-gray-200 shadow-sm rounded-md text-sm text-gray-700 min-h-[60px] whitespace-pre-wrap leading-relaxed mt-2">
                           {erp.observacao || <span className="italic text-gray-400 font-medium">Nenhuma observação registrada para este cliente ainda. Clique em editar para adicionar.</span>}
                         </div>
                       </div>
@@ -2085,13 +2179,35 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                     {mode === 'edit' && (
                       <div className="w-full max-w-3xl mx-auto flex flex-col gap-3">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm font-bold text-gray-700 flex items-center gap-2"><Edit3 className="h-4 w-4 text-primary"/> Editando Observação</span>
+                          <span className="text-sm font-bold text-gray-700 flex items-center gap-2"><Edit3 className="h-4 w-4 text-primary"/> Editando Anotações e Exceções</span>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500" onClick={() => handleToggleObs(erp.code)}><X className="h-4 w-4"/></Button>
                         </div>
+
+                        <div className="bg-white border border-gray-200 rounded-md p-4 mt-1">
+                          <span className="text-xs font-bold text-gray-800 mb-3 flex items-center gap-2"><Filter className="h-3.5 w-3.5"/> Exceções (Remover da Meta)</span>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-2">
+                            {["Etapa 1 (Entrada)", "Etapa 2 (Rupturas)", "Etapa 3 (Programação)", "Etapa 4 (Ger. OV)", "Etapa 5 (Liberação)", "Etapa 6 (Ocorrências)"].map((lbl, idx) => {
+                              const isForced = idx === 1 && erp.metric?.trocaAutomatica === "NAO";
+                              return (
+                              <label key={idx} className={`flex items-center gap-2 text-[10px] font-bold text-gray-500 cursor-pointer hover:text-primary transition-colors ${isForced ? 'opacity-50' : ''}`}>
+                                <input 
+                                  type="checkbox" 
+                                  className="accent-primary h-3.5 w-3.5 cursor-pointer disabled:opacity-50"
+                                  checked={erp.excecoes?.[idx] === true || isForced}
+                                  disabled={isForced}
+                                  title={isForced ? "Exceção forçada pelo banco de dados (TrocaAutomatica = NAO)" : ""}
+                                  onChange={(e) => obsContext.handleUpdateExcecao(cong.id, erp.code, erp.excecoes, idx, e.target.checked)}
+                                />
+                                {lbl} {isForced && "(Forçado)"}
+                              </label>
+                            )})}
+                          </div>
+                        </div>
+
                         <textarea 
                           defaultValue={erp.observacao} 
                           id={`obs-${erp.code}`}
-                          className="w-full p-4 border rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none min-h-[100px] shadow-sm leading-relaxed"
+                          className="w-full p-4 border rounded-md text-sm mt-1 focus:ring-1 focus:ring-primary focus:border-primary outline-none min-h-[100px] shadow-sm leading-relaxed"
                           placeholder="Digite os motivos, gargalos operacionais ou ações necessárias referentes à automação deste cliente..."
                         />
                         <div className="flex justify-end gap-2 mt-2">
