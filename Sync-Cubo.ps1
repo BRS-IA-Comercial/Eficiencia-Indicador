@@ -77,7 +77,7 @@ ResumoTrocas AS (
 SELECT DISTINCT
     C.CdExtCliente, C.Cart_Executivo_Vendas as Executivo, C.NmCliente as Cliente, C.NmConglomerado as Conglomerado,
     C.IntegracaoAutomaticaSAP, C.UtilizaJanelaCorte, C.FlagProgramacaoAutomatica, C.FlagUtilizaLiberacaoAutomatica,
-    C.Situacao, C.NmCarteira, J.FlagNaoLiberaAutomatico, C.MultiCDEnderecos, C.MultiCDPedidos, C.NaoLiberarPedidoSemOC,
+    C.Situacao, C.NmCarteira, J.FlagNaoLiberaAutomatico, C.MultiCDEnderecos, C.FatMultiCD, C.NaoLiberarPedidoSemOC,
     C.TrocaAutomatica,
     CASE WHEN J.QtdJanelas > 0 THEN 1 ELSE 0 END as TemJanelaMesAtual,
     ISNULL(P.Orders_Current, 0) as Orders_Current, ISNULL(P.ROB_Current, 0) as ROB_Current,
@@ -170,7 +170,7 @@ foreach ($Row in $Result) {
         "TemJanelaMesAtual" = $temJanelaMesAtual
         "FlagNaoLiberaAutomatico" = $flagNaoLibera
         "MultiCDEnderecos" = if ([DBNull]::Value.Equals($Row["MultiCDEnderecos"])) { "NAO" } else { $Row["MultiCDEnderecos"].ToString().Trim().ToUpper() }
-        "MultiCDPedidos" = if ([DBNull]::Value.Equals($Row["MultiCDPedidos"])) { "NAO" } else { $Row["MultiCDPedidos"].ToString().Trim().ToUpper() }
+        "FatMultiCD" = if ([DBNull]::Value.Equals($Row["FatMultiCD"])) { "NAO" } else { $Row["FatMultiCD"].ToString().Trim().ToUpper() }
         "NaoLiberarPedidoSemOC" = if ([DBNull]::Value.Equals($Row["NaoLiberarPedidoSemOC"])) { "NAO" } else { $Row["NaoLiberarPedidoSemOC"].ToString().Trim().ToUpper() }
         "TrocaAutomatica" = if ([DBNull]::Value.Equals($Row["TrocaAutomatica"])) { "SIM" } else { $Row["TrocaAutomatica"].ToString().Trim().ToUpper() }
 

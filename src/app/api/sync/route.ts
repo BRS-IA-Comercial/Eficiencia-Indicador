@@ -108,11 +108,11 @@ export async function POST(request: Request) {
         etapa3Ativo: item.Etapa3Ativo === true || item.etapa3Ativo === true,
         
         // 👇 CORREÇÃO: Lê a string real ou fallback
-        utilizaJanela: String(item.UtilizaJanelaCorte || item.utilizaJanela || "NAO"),
-        trocaAutomatica: String(item.TrocaAutomatica || item.trocaAutomatica || ""),
-        multiCdEnderecos: String(item.MultiCDEnderecos || item.multiCdEnderecos || "NAO"),
-        multiCdPedidos: String(item.MultiCDPedidos || item.multiCdPedidos || "NAO"),
-        naoLiberarPedidoSemOC: String(item.NaoLiberarPedidoSemOC || item.naoLiberarPedidoSemOC || "NAO"),
+        utilizaJanela: String(item.UtilizaJanelaCorte ?? item.utilizaJanela ?? "NAO").toUpperCase(),
+        trocaAutomatica: String(item.TrocaAutomatica ?? item.trocaAutomatica ?? "").toUpperCase(),
+        multiCdEnderecos: String(item.MultiCDEnderecos ?? item.multiCdEnderecos ?? "NAO").toUpperCase(),
+        fatMultiCD: String(item.FatMultiCD ?? item.fatMultiCD ?? "NAO").toUpperCase(), // Novo campo!
+        naoLiberarPedidoSemOC: String(item.NaoLiberarPedidoSemOC ?? item.naoLiberarPedidoSemOC ?? "NAO").toUpperCase(),
         
         ordersCurrent: Number(item.Orders_Current) || 0,
         robCurrent: Number(item.ROB_Current) || 0,

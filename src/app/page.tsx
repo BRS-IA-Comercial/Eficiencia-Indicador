@@ -40,6 +40,83 @@ const getPctColorClass = (pct: number, meta: number) => {
   return "text-gray-900 dark:text-white"; 
 };
 
+const getOverallAutomationPct = (stages: any[], activeAverageStages: number[]) => {
+  if (!stages || stages.length === 0 || !activeAverageStages || activeAverageStages.length === 0) return 0;
+  
+  let sumPct = 0;
+  let count = 0;
+  
+  stages.forEach((stg: any, idx: number) => {
+    if (activeAverageStages.includes(idx)) {
+      if (stg.metaOrders > 0) {
+        const pct = (stg.activeOrders / stg.metaOrders) * 100;
+        sumPct += Math.min(pct, 100); 
+        count++;
+      } else if (stg.totalOrders > 0) {
+        sumPct += 100;
+        count++;
+      }
+    }
+  });
+  
+  return count > 0 ? Math.round(sumPct / count) : 0;
+};
+
+const getBadgeStyle = (pct: number) => {
+  if (pct >= 95) return 'bg-secondary/10 text-secondary border-secondary/30';
+  if (pct >= 80) return 'bg-amber-50 text-amber-600 border-amber-300';
+  return 'bg-gray-100 text-gray-700 border-gray-300';
+};
+
+// COMPONENTE VISUAL PARA A DUPLA COLUNA DA ETAPA 2
+const renderStage2Content = (stage: any, weightedPct: number, metaPct: number, isGlobal: boolean = false) => {
+  const tAuto = stage.trocasAuto || 0;
+  const tMan = stage.trocasManual || 0;
+  const tTotal = tAuto + tMan;
+  const pctAut = tTotal > 0 ? Math.round((tAuto / tTotal) * 100) : 0;
+  const pctMan = tTotal > 0 ? Math.round((tMan / tTotal) * 100) : 0;
+
+  const textSize = isGlobal ? 'text-sm' : 'text-[11px]';
+  const labelSize = isGlobal ? 'text-[10px]' : 'text-[8px]';
+
+  return (
+    <div className="flex w-full h-full divide-x divide-gray-300/50">
+      <div className="flex-1 flex flex-col items-center justify-center px-1 pt-1 pb-3 text-center bg-transparent">
+        <span className={`${labelSize} font-black text-muted-foreground/50 uppercase tracking-tighter mb-0.5`}>Flag</span>
+        <span className={`${textSize} font-bold text-muted-foreground/80 leading-none mb-1`}>
+          {isGlobal ? `Meta: ${metaPct}%` : `${metaPct}%`}
+        </span>
+        <span className={`${textSize} font-black ${getPctColorClass(weightedPct, metaPct)} leading-none`}>
+          {isGlobal ? `Real: ${weightedPct}%` : `${weightedPct}%`}
+        </span>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center px-1 pt-1 pb-3 text-center bg-transparent">
+        <span className={`${labelSize} font-black text-muted-foreground/50 uppercase tracking-tighter mb-0.5`}>Trocas</span>
+        <span className={`${textSize} font-black text-secondary leading-none`} title="Trocas Automáticas">Aut: {pctAut}%</span>
+        <span className={`${textSize} font-black text-amber-600 mt-1 leading-none`} title="Trocas Manuais">Man: {pctMan}%</span>
+      </div>
+    </div>
+  );
+};
+
+// COMPONENTE VISUAL PARA ALINHAMENTO PADRÃO DAS OUTRAS ETAPAS
+const renderStandardStage = (weightedPct: number, metaPct: number, isGlobal: boolean = false) => {
+  const textSize = isGlobal ? 'text-sm' : 'text-[11px]';
+  const labelSize = isGlobal ? 'text-[10px]' : 'text-[8px]';
+
+  return (
+    <div className="flex flex-col items-center justify-center w-full h-full px-1 pt-1 pb-3 text-center">
+      <span className={`${labelSize} font-black opacity-0 uppercase tracking-tighter mb-0.5 select-none`}>-</span>
+      <span className={`${textSize} font-bold text-muted-foreground/80 leading-none mb-1`}>
+        {isGlobal ? `Meta: ${metaPct}%` : `${metaPct}%`}
+      </span>
+      <span className={`${textSize} font-black ${getPctColorClass(weightedPct, metaPct)} leading-none`}>
+        {isGlobal ? `Real: ${weightedPct}%` : `${weightedPct}%`}
+      </span>
+    </div>
+  );
+};
+
 const ENTRADA_SISTEMAS: Record<string, boolean> = {
   "Supply Manager": true,
   "Pré Pedidos Manual": false,
@@ -146,6 +223,14 @@ function MultiSelectDropdown({ title, options, selected, onChange, isOpen, onTog
 type LogGroupMode = 'executivo' | 'cliente' | 'data';
 type ObsMode = 'view' | 'auth' | 'edit';
 
+type ActionPlan = {
+  id: string;
+  etapaIdx: number;
+  acao: string;
+  responsavel: string;
+  prazo: string;
+};
+
 export default function OrderFulfillmentDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [periodo, setPeriodo] = useState<"30D" | "60D" | "90D">("30D");
@@ -165,12 +250,21 @@ export default function OrderFulfillmentDashboard() {
   const [showFilters, setShowFilters] = useState(false);
   const [showNavMenu, setShowNavMenu] = useState(false);
 
+  // Filtros
   const [filterExecutivos, setFilterExecutivos] = useState<string[]>([]);
   const [filterCarteiras, setFilterCarteiras] = useState<string[]>([]);
   const [filterClientes, setFilterClientes] = useState<string[]>([]);
   const [filterMultiCD, setFilterMultiCD] = useState<string[]>([]);
   const [filterRegraOC, setFilterRegraOC] = useState<string[]>([]);
   const [filterPerfil, setFilterPerfil] = useState<string[]>([]); 
+  
+  const [filterEtapa1, setFilterEtapa1] = useState<string[]>([]);
+  const [filterEtapa2, setFilterEtapa2] = useState<string[]>([]);
+  const [filterEtapa3, setFilterEtapa3] = useState<string[]>([]);
+  const [filterEtapa4, setFilterEtapa4] = useState<string[]>([]);
+  const [filterEtapa5, setFilterEtapa5] = useState<string[]>([]);
+  const [filterEtapa6, setFilterEtapa6] = useState<string[]>([]);
+
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const [groupByPortfolio, setGroupByPortfolio] = useState(true);
@@ -183,11 +277,107 @@ export default function OrderFulfillmentDashboard() {
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState(false);
 
+  // Configurações e Planos de Ação
+  const [activeAverageStages, setActiveAverageStages] = useState<number[]>([0, 1, 2, 3, 4, 5]);
+  const [entrySystems, setEntrySystems] = useState<Record<string, boolean>>({
+    "Supply Manager": true,
+    "Pré Pedidos Manual": false,
+    "Painel Pré Pedidos Manual": false,
+    "Pré Pedidos Automático": true,
+    "Painel Pré Pedidos Automático": true,
+    "PDF": false,
+    "PDF IA": true,
+    "PDF - IA": true,
+    "Importação Excel": false,
+    "Importação Excel IA": true,
+    "Webservice": false
+  });
+
+  const [actionPlans, setActionPlans] = useState<ActionPlan[]>([]);
+  const [apEtapa, setApEtapa] = useState("0");
+  const [apAcao, setApAcao] = useState("");
+  const [apResp, setApResp] = useState("");
+  const [apPrazo, setApPrazo] = useState("");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const db = useFirestore();
   const app = useFirebaseApp();
   const { toast } = useToast();
   const projectId = app.options.projectId;
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedStages = localStorage.getItem('activeAverageStages');
+      if (savedStages) {
+        try { setActiveAverageStages(JSON.parse(savedStages)); } catch (e) {}
+      }
+      const savedSystems = localStorage.getItem('entrySystemsConfig');
+      if (savedSystems) {
+        try { setEntrySystems(JSON.parse(savedSystems)); } catch (e) {}
+      }
+      const savedAp = localStorage.getItem('actionPlansConfig');
+      if (savedAp) {
+        try { setActionPlans(JSON.parse(savedAp)); } catch (e) {}
+      }
+    }
+  }, []);
+
+  const toggleAverageStage = (idx: number) => {
+    setActiveAverageStages(prev => {
+      if (prev.length === 1 && prev.includes(idx)) return prev;
+      const next = prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx].sort();
+      if (typeof window !== "undefined") localStorage.setItem('activeAverageStages', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const updateEntrySystem = (name: string, isAuto: boolean) => {
+    setEntrySystems(prev => {
+      const next = { ...prev, [name]: isAuto };
+      if (typeof window !== "undefined") localStorage.setItem('entrySystemsConfig', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const removeEntrySystem = (name: string) => {
+    setEntrySystems(prev => {
+      const next = { ...prev };
+      delete next[name];
+      if (typeof window !== "undefined") localStorage.setItem('entrySystemsConfig', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleAddActionPlan = () => {
+    if (!apAcao.trim() || !apResp.trim() || !apPrazo.trim()) {
+      toast({ variant: "destructive", title: "Atenção", description: "Preencha a ação, o responsável e o prazo para adicionar o plano." });
+      return;
+    }
+    const newPlan: ActionPlan = {
+      id: Date.now().toString(),
+      etapaIdx: parseInt(apEtapa),
+      acao: apAcao.trim(),
+      responsavel: apResp.trim(),
+      prazo: apPrazo
+    };
+    setActionPlans(prev => {
+      const next = [...prev, newPlan];
+      if (typeof window !== "undefined") localStorage.setItem('actionPlansConfig', JSON.stringify(next));
+      return next;
+    });
+    setApAcao("");
+    setApResp("");
+    setApPrazo("");
+    toast({ title: "Sucesso", description: "Plano de ação adicionado!" });
+  };
+
+  const removeActionPlan = (id: string) => {
+    setActionPlans(prev => {
+      const next = prev.filter(p => p.id !== id);
+      if (typeof window !== "undefined") localStorage.setItem('actionPlansConfig', JSON.stringify(next));
+      return next;
+    });
+  };
 
   useEffect(() => { if (typeof window !== "undefined") setHost(window.location.host); }, []);
 
@@ -351,9 +541,75 @@ export default function OrderFulfillmentDashboard() {
     };
   }, [cuboMetrics, erpMappings]);
 
-  const multiCDOptions = ["Auto | Endereço", "Auto | Ruptura", "Manual | Pedido"];
-  const regraOCOptions = ["Exige OC", "Livre (Sem OC)"];
-  const perfilOptions = ["SLA", "JANELA"];
+  // Opções Dinâmicas para os Filtros
+  const { multiCDOptions, regraOCOptions, perfilOptions, etapa1Options, etapa2Options, autoManualOptions } = useMemo(() => {
+    if (!cuboMetrics || !erpMappings) {
+      return { multiCDOptions: [], regraOCOptions: [], perfilOptions: [], etapa1Options: [], etapa2Options: [], autoManualOptions: [] };
+    }
+
+    const mCD = new Set<string>();
+    const rOC = new Set<string>();
+    const perf = new Set<string>();
+    const e1 = new Set<string>();
+    const e2 = new Set<string>();
+    const autoMan = new Set<string>();
+
+    const metricMap: Record<string, any> = {};
+    cuboMetrics.forEach((m: any) => { metricMap[m.id] = m; });
+
+    erpMappings.forEach((m: any) => {
+      const docId = m.id || m.conglomerado;
+      const sistemaConglomerado = sistemasOverrides[docId] !== undefined ? sistemasOverrides[docId] : (m.sistemaEntrada || ""); 
+
+      const erpCodes = (m.erpMaeCodes || []).filter((code: string) => metricMap[code]);
+      
+      erpCodes.forEach((code: string) => {
+        const metric = metricMap[code];
+        if (metric?.isAtivo === false) return; // Só conta os ativos
+
+        // Multi CD
+        const isEnd = metric?.multiCdEnderecos === "SIM" || metric?.multiCdEnderecos === "TRUE" || metric?.multiCdEnderecos === "1" || metric?.multiCdEnderecos === true;
+        const isManual = metric?.fatMultiCD === "SIM" || metric?.fatMultiCD === "TRUE" || metric?.fatMultiCD === "1" || metric?.fatMultiCD === true;
+        mCD.add(isEnd ? "Multi CD | Automático" : (isManual ? "Multi CD Pedido | Manual" : "Não é Multi CD"));
+        
+        // Regra OC
+        const exigeOC = metric?.naoLiberarPedidoSemOC === "SIM" || metric?.naoLiberarPedidoSemOC === "TRUE" || metric?.naoLiberarPedidoSemOC === "1";
+        rOC.add(exigeOC ? "Precisa de OC" : "Livre (Sem OC)");
+
+        // Perfil
+        const isSLA = String(metric?.utilizaJanela).toUpperCase() === "NAO";
+        perf.add(isSLA ? "SLA" : "JANELA");
+
+        // Etapas
+        const erpOverrideKey = `${docId}_${code}`;
+        const erpSistemaProprio = sistemasOverrides[erpOverrideKey] !== undefined ? sistemasOverrides[erpOverrideKey] : (m.erpSistemasOverrides?.[code] || "");
+        const erpExcecoesDb = m.erpExcecoes?.[code] || {}; 
+        const sistemaFinal = erpSistemaProprio ? erpSistemaProprio : sistemaConglomerado;
+
+        const getStageLabel = (idx: number, isActive: boolean, forcedException: boolean = false) => {
+           if (erpExcecoesDb[idx] === true || forcedException) return "N/A (Exceção)";
+           return isActive ? "AUTOMÁTICO" : "MANUAL";
+        };
+
+        e1.add(erpExcecoesDb[0] === true ? "N/A (Exceção)" : (sistemaFinal || "Não Definido"));
+        e2.add(erpExcecoesDb[1] === true || metric?.trocaAutomatica === "NAO" ? "N/A (Exceção)" : "Aceita Troca"); 
+        
+        autoMan.add(getStageLabel(2, metric?.etapa2Ativo || false)); // E3
+        autoMan.add(getStageLabel(3, metric?.flagGeraOVAuto || false)); // E4
+        autoMan.add(getStageLabel(4, metric?.etapa3Ativo || false)); // E5
+        autoMan.add(getStageLabel(5, false)); // E6
+      });
+    });
+
+    return {
+      multiCDOptions: Array.from(mCD).sort(),
+      regraOCOptions: Array.from(rOC).sort(),
+      perfilOptions: Array.from(perf).sort(),
+      etapa1Options: Array.from(e1).sort(),
+      etapa2Options: Array.from(e2).sort(),
+      autoManualOptions: Array.from(autoMan).sort()
+    };
+  }, [cuboMetrics, erpMappings, sistemasOverrides]);
 
   const groupedAndFilteredLogs = useMemo(() => {
     if (!automationLogs || automationLogs.length === 0) return [];
@@ -446,7 +702,7 @@ export default function OrderFulfillmentDashboard() {
     
     let globalOrders3M = 0, globalRob3M = 0, globalOrdersCur = 0, globalRobCur = 0, globalErpsCount = 0;
     
-    const globalStages = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
+    const globalStages = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0, trocasAuto: 0, trocasManual: 0 }));
     
     cuboMetrics.forEach((m: any) => { metricMap[m.id] = m; });
 
@@ -470,7 +726,7 @@ export default function OrderFulfillmentDashboard() {
       if (!execMap[execName].portfolios[cartName]) execMap[execName].portfolios[cartName] = { name: cartName, conglomerates: [] };
 
       let congOrders3M = 0, congRob3M = 0, congOrdersCur = 0, congRobCur = 0, congErpsCount = 0;
-      const stageStatsCong = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
+      const stageStatsCong = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0, trocasAuto: 0, trocasManual: 0 }));
       const systemWeights: Record<string, number> = {};
       const erps: any[] = [];
 
@@ -479,33 +735,52 @@ export default function OrderFulfillmentDashboard() {
         const isAtivo = metric?.isAtivo !== false;
 
         const isEnd = metric?.multiCdEnderecos === "SIM" || metric?.multiCdEnderecos === "TRUE" || metric?.multiCdEnderecos === "1" || metric?.multiCdEnderecos === true;
-        const isRup = metric?.multiCdPedidos === "SIM" || metric?.multiCdPedidos === "TRUE" || metric?.multiCdPedidos === "1" || metric?.multiCdPedidos === true;
-        const multiCdLabel = isEnd ? "Auto | Endereço" : (isRup ? "Auto | Ruptura" : "Manual | Pedido");
+        const isManual = metric?.fatMultiCD === "SIM" || metric?.fatMultiCD === "TRUE" || metric?.fatMultiCD === "1" || metric?.fatMultiCD === true;
+        const multiCdLabel = isEnd ? "Multi CD | Automático" : (isManual ? "Multi CD Pedido | Manual" : "Não é Multi CD");
         
         const exigeOC = metric?.naoLiberarPedidoSemOC === "SIM" || metric?.naoLiberarPedidoSemOC === "TRUE" || metric?.naoLiberarPedidoSemOC === "1";
-        const ocLabel = exigeOC ? "Exige OC" : "Livre (Sem OC)";
+        const ocLabel = exigeOC ? "Precisa de OC" : "Livre (Sem OC)";
 
-        const isSLA = metric?.utilizaJanela === "NAO";
+        const isSLA = String(metric?.utilizaJanela).toUpperCase() === "NAO";
         const profileLabel = isSLA ? "SLA" : "JANELA";
 
         if (filterMultiCD.length > 0 && !filterMultiCD.includes(multiCdLabel)) return;
         if (filterRegraOC.length > 0 && !filterRegraOC.includes(ocLabel)) return;
         if (filterPerfil.length > 0 && !filterPerfil.includes(profileLabel)) return;
         
-        congErpsCount++;
-        globalErpsCount++;
-
-        let ord3M = 0, rob3M = 0, ordCur = 0, robCur = 0, rup3M = 0;
-        let stagesForStats = Array(6).fill(null).map(() => ({ totalOrders: 0, activeOrders: 0, metaOrders: 0, rupturedOrders: 0, baseOrders: 0, isException: false }));
-
         const erpOverrideKey = `${docId}_${code}`;
         const erpSistemaDb = m.erpSistemasOverrides?.[code] || "";
-        const erpSistemaProprio = sistemasOverrides[erpOverrideKey] !== undefined ? sistemasOverrides[erpOverrideKey] : erpSistemaDb;
+        const erpSistemaProprio = sistemasOverrides[erpOverrideKey] !== undefined ? sistemasOverrides[erpOverrideKey] : (m.erpSistemasOverrides?.[code] || "");
         const erpObservacaoDb = m.erpObservacoes?.[code] || "";
         const erpExcecoesDb = m.erpExcecoes?.[code] || {}; 
 
         const sistemaFinal = erpSistemaProprio ? erpSistemaProprio : sistemaConglomerado;
-        const isEtapa1Auto = sistemaFinal ? ENTRADA_SISTEMAS[sistemaFinal] || false : false;
+        const isEtapa1Auto = sistemaFinal ? entrySystems[sistemaFinal] || false : false;
+
+        const getStageLabel = (idx: number, isActive: boolean, forcedException: boolean = false) => {
+           if (erpExcecoesDb[idx] === true || forcedException) return "N/A (Exceção)";
+           return isActive ? "AUTOMÁTICO" : "MANUAL";
+        };
+
+        const etapa1Label = erpExcecoesDb[0] === true ? "N/A (Exceção)" : (sistemaFinal || "Não Definido");
+        const etapa2Label = erpExcecoesDb[1] === true || metric?.trocaAutomatica === "NAO" ? "N/A (Exceção)" : "Aceita Troca"; 
+        const etapa3Label = getStageLabel(2, metric?.etapa2Ativo || false);
+        const etapa4Label = getStageLabel(3, metric?.flagGeraOVAuto || false);
+        const etapa5Label = getStageLabel(4, metric?.etapa3Ativo || false);
+        const etapa6Label = getStageLabel(5, false);
+
+        if (filterEtapa1.length > 0 && !filterEtapa1.includes(etapa1Label)) return;
+        if (filterEtapa2.length > 0 && !filterEtapa2.includes(etapa2Label)) return;
+        if (filterEtapa3.length > 0 && !filterEtapa3.includes(etapa3Label)) return;
+        if (filterEtapa4.length > 0 && !filterEtapa4.includes(etapa4Label)) return;
+        if (filterEtapa5.length > 0 && !filterEtapa5.includes(etapa5Label)) return;
+        if (filterEtapa6.length > 0 && !filterEtapa6.includes(etapa6Label)) return;
+
+        congErpsCount++;
+        globalErpsCount++;
+
+        let ord3M = 0, rob3M = 0, ordCur = 0, robCur = 0, rup3M = 0;
+        let stagesForStats = Array(6).fill(null).map(() => ({ totalOrders: 0, activeOrders: 0, metaOrders: 0, rupturedOrders: 0, baseOrders: 0, trocasAuto: 0, trocasManual: 0, isException: false }));
 
         const hist = metric?.[`Historico_${periodo}`] || {
             Orders: metric?.avgOrders3M || 0,
@@ -529,14 +804,11 @@ export default function OrderFulfillmentDashboard() {
             systemWeights[sistemaFinal] = (systemWeights[sistemaFinal] || 0) + ord3M;
           }
 
-          const tAuto = hist.trocasAuto || 0;
-          const tManual = hist.trocasManual || 0;
-          const tTotal = tAuto + tManual;
-          const isEtapa2Auto = tTotal > 0 && (tAuto >= tManual); 
+          const isEtapa2Auto = metric?.trocaAutomatica !== "NAO"; 
 
           const stagesActive = [
             isEtapa1Auto, 
-            isEtapa2Auto,                      
+            isEtapa2Auto,                     
             metric?.etapa2Ativo || false,      
             metric?.flagGeraOVAuto || false,   
             metric?.etapa3Ativo || false,      
@@ -544,8 +816,8 @@ export default function OrderFulfillmentDashboard() {
           ];
 
           stagesActive.forEach((isActive, i) => {
-            // 👇 NOVO: Lê a exceção manual, e se for a Etapa 2 (i === 1) e o SQL disser que é exceção, força ser true.
             let isException = erpExcecoesDb[i] === true;
+            
             if (i === 1 && metric?.trocaAutomatica === "NAO") {
               isException = true; 
             }
@@ -555,9 +827,11 @@ export default function OrderFulfillmentDashboard() {
             let rupOrd = 0;
 
             if (i === 1) {
-              tOrd = tTotal;
-              aOrd = tAuto;
               rupOrd = rup3M; 
+              stageStatsCong[i].trocasAuto += hist.trocasAuto || 0;
+              stageStatsCong[i].trocasManual += hist.trocasManual || 0;
+              globalStages[i].trocasAuto += hist.trocasAuto || 0;
+              globalStages[i].trocasManual += hist.trocasManual || 0;
             }
 
             let mOrd = isException ? 0 : tOrd; 
@@ -582,7 +856,7 @@ export default function OrderFulfillmentDashboard() {
               globalStages[i].active += 1;
             }
 
-            stagesForStats[i] = { totalOrders: tOrd, activeOrders: aOrd, metaOrders: mOrd, rupturedOrders: rupOrd, baseOrders: ord3M, isException: isException };
+            stagesForStats[i] = { totalOrders: tOrd, activeOrders: aOrd, metaOrders: mOrd, rupturedOrders: rupOrd, baseOrders: ord3M, trocasAuto: (i===1 ? hist.trocasAuto||0 : 0), trocasManual: (i===1 ? hist.trocasManual||0 : 0), isException: isException };
           });
         }
         
@@ -618,11 +892,11 @@ export default function OrderFulfillmentDashboard() {
 
     const executives = Object.values(execMap).map(exec => {
       let execOrders3M = 0, execRob3M = 0, execOrdersCur = 0, execRobCur = 0, execTotalErps = 0;
-      const stageStatsExec = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
+      const stageStatsExec = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0, trocasAuto: 0, trocasManual: 0 }));
 
       const portfolios = Object.values(exec.portfolios).map(port => {
         let portOrders3M = 0, portRob3M = 0, portOrdersCur = 0, portRobCur = 0, portTotalErps = 0;
-        const stageStatsPort = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0 }));
+        const stageStatsPort = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0, trocasAuto: 0, trocasManual: 0 }));
 
         port.conglomerates.forEach(cong => {
           portOrders3M += cong.stats.avgOrders3M; portRob3M += cong.stats.avgRob3M;
@@ -640,6 +914,8 @@ export default function OrderFulfillmentDashboard() {
             stageStatsPort[i].metaOrders += stg.metaOrders;
             stageStatsPort[i].rupturedOrders += stg.rupturedOrders; 
             stageStatsPort[i].baseOrders += stg.baseOrders;
+            stageStatsPort[i].trocasAuto += stg.trocasAuto || 0;
+            stageStatsPort[i].trocasManual += stg.trocasManual || 0;
 
             stageStatsExec[i].total += stg.total; stageStatsExec[i].active += stg.active;
             stageStatsExec[i].totalOrders += stg.totalOrders; 
@@ -647,11 +923,13 @@ export default function OrderFulfillmentDashboard() {
             stageStatsExec[i].metaOrders += stg.metaOrders;
             stageStatsExec[i].rupturedOrders += stg.rupturedOrders; 
             stageStatsExec[i].baseOrders += stg.baseOrders;
+            stageStatsExec[i].trocasAuto += stg.trocasAuto || 0;
+            stageStatsExec[i].trocasManual += stg.trocasManual || 0;
           });
         });
 
         return { name: port.name, conglomerates: sortNodes(port.conglomerates), stats: { avgOrders3M: portOrders3M, avgRob3M: portRob3M, ordersCurrent: portOrdersCur, robCurrent: portRobCur, totalErps: portTotalErps, stages: stageStatsPort } };
-      });
+      }).filter(port => port.stats.totalErps > 0);
 
       const allConglomerates: any[] = [];
       portfolios.forEach(p => p.conglomerates.forEach((c: any) => allConglomerates.push(c)));
@@ -662,10 +940,10 @@ export default function OrderFulfillmentDashboard() {
         conglomerates: sortNodes(allConglomerates), 
         stats: { avgOrders3M: execOrders3M, avgRob3M: execRob3M, ordersCurrent: execOrdersCur, robCurrent: execRobCur, totalErps: execTotalErps, stages: stageStatsExec } 
       };
-    });
+    }).filter(exec => exec.stats.totalErps > 0);
 
     return { executives: sortNodes(executives), globalStats: { avgOrders3M: globalOrders3M, avgRob3M: globalRob3M, ordersCurrent: globalOrdersCur, robCurrent: globalRobCur, totalErps: globalErpsCount, stages: globalStages } };
-  }, [cuboMetrics, erpMappings, filterExecutivos, filterCarteiras, filterClientes, filterMultiCD, filterRegraOC, filterPerfil, sortConfig, sistemasOverrides, periodo]);
+  }, [cuboMetrics, erpMappings, filterExecutivos, filterCarteiras, filterClientes, filterMultiCD, filterRegraOC, filterPerfil, filterEtapa1, filterEtapa2, filterEtapa3, filterEtapa4, filterEtapa5, filterEtapa6, sortConfig, sistemasOverrides, periodo, entrySystems]);
 
   const rupturasRanking = useMemo(() => {
     if (!groupedData) return [];
@@ -676,7 +954,6 @@ export default function OrderFulfillmentDashboard() {
       exec.portfolios.forEach((port: any) => {
         port.conglomerates.forEach((cong: any) => {
           cong.erps.forEach((erp: any) => {
-            // 👇 NOVO: Considera também a exceção do banco de dados para esconder do ranking
             const isExceptionEtapa2 = erp.excecoes?.[1] === true || erp.metric?.trocaAutomatica === "NAO"; 
             
             const hist = erp.metric?.[`Historico_${periodo}`] || {
@@ -714,8 +991,9 @@ export default function OrderFulfillmentDashboard() {
     return allErps.sort((a, b) => b.trocasManual - a.trocasManual);
   }, [groupedData, periodo]);
 
-  const hasActiveFilter = filterExecutivos.length > 0 || filterCarteiras.length > 0 || filterClientes.length > 0 || filterMultiCD.length > 0 || filterRegraOC.length > 0 || filterPerfil.length > 0;
-  const activeFilterCount = filterExecutivos.length + filterCarteiras.length + filterClientes.length + filterMultiCD.length + filterRegraOC.length + filterPerfil.length;
+  const hasActiveFilter = filterExecutivos.length > 0 || filterCarteiras.length > 0 || filterClientes.length > 0 || filterMultiCD.length > 0 || filterRegraOC.length > 0 || filterPerfil.length > 0 || filterEtapa1.length > 0 || filterEtapa2.length > 0 || filterEtapa3.length > 0 || filterEtapa4.length > 0 || filterEtapa5.length > 0 || filterEtapa6.length > 0;
+  
+  const activeFilterCount = filterExecutivos.length + filterCarteiras.length + filterClientes.length + filterMultiCD.length + filterRegraOC.length + filterPerfil.length + filterEtapa1.length + filterEtapa2.length + filterEtapa3.length + filterEtapa4.length + filterEtapa5.length + filterEtapa6.length;
 
   const toggleItem = (id: string, currentState: boolean) => {
     setExpandedItems(prev => ({ ...prev, [id]: !currentState }));
@@ -843,8 +1121,8 @@ export default function OrderFulfillmentDashboard() {
   const stages = ["Entrada de Pedidos", "Tratamento de Rupturas", "Programação de Entrega", "Geração de OV", "Liberação de Pedidos", "Ocorrências de Entrega"];
   
   const gridTemplate = showProfile 
-    ? `minmax(250px, 350px) 70px 90px 70px 90px 100px repeat(6, minmax(130px, 1fr)) 45px`
-    : `minmax(250px, 350px) 50px repeat(6, minmax(130px, 1fr)) 45px`;
+    ? `minmax(250px, 350px) 70px 90px 70px 90px 100px minmax(130px, 1fr) minmax(240px, 2fr) repeat(4, minmax(130px, 1fr)) 45px`
+    : `minmax(250px, 350px) 50px minmax(130px, 1fr) minmax(240px, 2fr) repeat(4, minmax(130px, 1fr)) 45px`;
 
   const renderPasswordScreen = () => (
     <div className="flex items-center justify-center min-h-[500px]">
@@ -898,7 +1176,8 @@ export default function OrderFulfillmentDashboard() {
     obsError, setObsError,
     isConfigAuthenticated, setIsConfigAuthenticated,
     handleUpdateObservacao,
-    handleUpdateExcecao 
+    handleUpdateExcecao,
+    activeAverageStages
   };
 
   return (
@@ -1049,6 +1328,60 @@ export default function OrderFulfillmentDashboard() {
                 onToggle={() => setOpenDropdown(openDropdown === 'perfil' ? null : 'perfil')}
               />
 
+              <div className="w-full h-px bg-gray-100 my-1"></div>
+              <div className="flex items-center gap-2 w-full text-xs font-bold text-muted-foreground uppercase tracking-widest pb-1 border-b mb-1">
+                <Layers className="h-3 w-3" /> Filtrar por Etapas
+              </div>
+
+              <MultiSelectDropdown 
+                title="E1: Entrada" 
+                options={etapa1Options} 
+                selected={filterEtapa1} 
+                onChange={setFilterEtapa1} 
+                isOpen={openDropdown === 'e1'} 
+                onToggle={() => setOpenDropdown(openDropdown === 'e1' ? null : 'e1')}
+              />
+              <MultiSelectDropdown 
+                title="E2: Rupturas" 
+                options={etapa2Options} 
+                selected={filterEtapa2} 
+                onChange={setFilterEtapa2} 
+                isOpen={openDropdown === 'e2'} 
+                onToggle={() => setOpenDropdown(openDropdown === 'e2' ? null : 'e2')}
+              />
+              <MultiSelectDropdown 
+                title="E3: Programação" 
+                options={autoManualOptions} 
+                selected={filterEtapa3} 
+                onChange={setFilterEtapa3} 
+                isOpen={openDropdown === 'e3'} 
+                onToggle={() => setOpenDropdown(openDropdown === 'e3' ? null : 'e3')}
+              />
+              <MultiSelectDropdown 
+                title="E4: Ger. OV" 
+                options={autoManualOptions} 
+                selected={filterEtapa4} 
+                onChange={setFilterEtapa4} 
+                isOpen={openDropdown === 'e4'} 
+                onToggle={() => setOpenDropdown(openDropdown === 'e4' ? null : 'e4')}
+              />
+              <MultiSelectDropdown 
+                title="E5: Liberação" 
+                options={autoManualOptions} 
+                selected={filterEtapa5} 
+                onChange={setFilterEtapa5} 
+                isOpen={openDropdown === 'e5'} 
+                onToggle={() => setOpenDropdown(openDropdown === 'e5' ? null : 'e5')}
+              />
+              <MultiSelectDropdown 
+                title="E6: Ocorrências" 
+                options={autoManualOptions} 
+                selected={filterEtapa6} 
+                onChange={setFilterEtapa6} 
+                isOpen={openDropdown === 'e6'} 
+                onToggle={() => setOpenDropdown(openDropdown === 'e6' ? null : 'e6')}
+              />
+
               {hasActiveFilter && (
                 <button 
                   onClick={() => { 
@@ -1058,6 +1391,12 @@ export default function OrderFulfillmentDashboard() {
                     setFilterMultiCD([]); 
                     setFilterRegraOC([]); 
                     setFilterPerfil([]); 
+                    setFilterEtapa1([]);
+                    setFilterEtapa2([]);
+                    setFilterEtapa3([]);
+                    setFilterEtapa4([]);
+                    setFilterEtapa5([]);
+                    setFilterEtapa6([]);
                   }}
                   className="ml-auto hover:bg-red-50 px-3 py-1.5 rounded-md transition-colors text-red-500 border border-red-100 hover:border-red-300 flex items-center gap-1.5"
                   title="Limpar Todos os Filtros"
@@ -1100,12 +1439,15 @@ export default function OrderFulfillmentDashboard() {
                   </>
                 )}
 
-                {stages.map((label, i) => (
-                  <div key={i} className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-r border-white/20 cursor-pointer hover:bg-primary transition-colors" onClick={() => requestSort(`etapa${i}`)}>
-                    <div className="opacity-70 flex items-center justify-center gap-1 w-full">ETAPA {i + 1} {getSortIcon(`etapa${i}`)}</div>
-                    <span className="text-[10px] uppercase">{label}</span>
-                  </div>
-                ))}
+                {stages.map((label, i) => {
+                  const colBg = i % 2 !== 0 ? 'bg-black/[0.04]' : '';
+                  return (
+                    <div key={i} className={`bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-r border-white/20 cursor-pointer hover:bg-primary transition-colors ${colBg}`} onClick={() => requestSort(`etapa${i}`)}>
+                      <div className="opacity-70 flex items-center justify-center gap-1 w-full">ETAPA {i + 1} {getSortIcon(`etapa${i}`)}</div>
+                      <span className="text-[10px] uppercase">{label}</span>
+                    </div>
+                  );
+                })}
 
                 <div className="bg-gray-100 p-2 flex items-center justify-center border-r hover:bg-gray-200 transition-colors" title="Anotações e Justificativas">
                   <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -1162,10 +1504,16 @@ export default function OrderFulfillmentDashboard() {
                 {globalStats && groupedData.length > 0 && (
                   <div className="grid border-b-2 border-gray-300 bg-gray-200/80 sticky top-0 z-10 backdrop-blur-sm" style={{ gridTemplateColumns: gridTemplate }}>
                     <div className="p-3 pl-4 flex items-center border-r border-gray-300/50">
-                      <span className="font-black text-sm text-gray-800 uppercase tracking-tight">
-                        {hasActiveFilter ? 'TOTAL FILTRADO' : 'TOTAL GLOBAL'}
-                      </span>
-                      <Badge variant="outline" className="ml-3 text-[10px] bg-white border-gray-300 text-gray-600 shadow-sm">{globalStats.totalErps} ERPs</Badge>
+                      <div className="flex flex-col flex-1 min-w-0 pr-2">
+                        <span className="font-black text-lg text-gray-800 uppercase tracking-tight truncate">
+                          {hasActiveFilter ? 'TOTAL FILTRADO' : 'TOTAL GLOBAL'}
+                        </span>
+                        <span className="text-xs font-bold text-muted-foreground/70 mt-0.5">{globalStats.totalErps} ERPs</span>
+                      </div>
+                      <Badge variant="outline" className={`ml-3 shrink-0 text-lg px-3 py-1 font-black shadow-md ${getBadgeStyle(getOverallAutomationPct(globalStats.stages, activeAverageStages))}`}>
+                        {getOverallAutomationPct(globalStats.stages, activeAverageStages)}% AUTO
+                      </Badge>
+                      <div className="shrink-0 pl-2 w-[24px]"></div>
                     </div>
                     <div className="p-2 border-r border-gray-300/50"></div>
                     
@@ -1174,12 +1522,12 @@ export default function OrderFulfillmentDashboard() {
                         <div className="p-2 border-r border-gray-300/50"></div>
                         <div className="p-2 border-r border-gray-300/50"></div>
                         <div className="flex flex-col items-center justify-center p-2 border-r border-gray-300/50">
-                          <span className="font-bold text-xs text-gray-800">{formatNumber(globalStats.avgOrders3M)}</span>
-                          <span className="text-[9px] text-muted-foreground font-semibold">{formatNumber(globalStats.ordersCurrent)}</span>
+                          <span className="font-bold text-sm text-gray-800">{formatNumber(globalStats.avgOrders3M)}</span>
+                          <span className="text-[10px] text-muted-foreground font-semibold">{formatNumber(globalStats.ordersCurrent)}</span>
                         </div>
                         <div className="flex flex-col items-center justify-center p-2 border-r border-gray-300/50">
-                          <span className="font-bold text-xs text-gray-800">{formatNumber(globalStats.avgRob3M)}</span>
-                          <span className="text-[9px] text-muted-foreground font-semibold">{formatNumber(globalStats.robCurrent)}</span>
+                          <span className="font-bold text-sm text-gray-800">{formatNumber(globalStats.avgRob3M)}</span>
+                          <span className="text-[10px] text-muted-foreground font-semibold">{formatNumber(globalStats.robCurrent)}</span>
                         </div>
                       </>
                     )}
@@ -1187,17 +1535,46 @@ export default function OrderFulfillmentDashboard() {
                     {globalStats.stages.map((stage: any, i: number) => {
                       const weightedPct = stage.totalOrders > 0 ? Math.round((stage.activeOrders / stage.totalOrders) * 100) : 0;
                       const metaPct = stage.totalOrders > 0 ? Math.round((stage.metaOrders / stage.totalOrders) * 100) : 0;
+                      const colBg = i % 2 !== 0 ? 'bg-black/[0.04]' : '';
+                      const stageActions = actionPlans.filter(p => p.etapaIdx === i);
                       
                       return (
-                        <div key={i} className="p-2 flex flex-col items-center justify-center border-r border-gray-300/50 last:border-r-0">
-                          <span className={`text-xs font-black ${getPctColorClass(weightedPct, metaPct)}`}>{weightedPct}%</span>
-                          {i === 1 ? (
-                            <div className="flex flex-col items-center mt-0.5">
-                              <span className="text-[8px] text-muted-foreground/60 font-medium">Meta: {metaPct}%</span>
-                              <span className="text-[8px] text-muted-foreground font-semibold">{stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura</span>
+                        <div key={i} className={`relative flex flex-col items-center justify-center border-r border-gray-300/50 last:border-r-0 h-full w-full group ${colBg}`}>
+                          
+                          {/* BOLINHA INDICADORA DE PLANOS DE AÇÃO */}
+                          {stageActions.length > 0 && (
+                            <div className="absolute top-1.5 right-1.5 z-10">
+                              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-secondary text-[8px] text-white font-bold shadow-md cursor-pointer">
+                                {stageActions.length}
+                              </span>
                             </div>
+                          )}
+                          
+                          {/* TOOLTIP DE AÇÕES FLUTUANTE */}
+                          {stageActions.length > 0 && (
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-gray-800 text-white p-3 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                              <div className="text-[10px] font-bold mb-2 border-b border-gray-600 pb-1.5 flex items-center gap-1 uppercase tracking-widest text-secondary">
+                                <Target className="h-3 w-3" /> Planos de Ação ({stages[i]})
+                              </div>
+                              <div className="flex flex-col gap-2 mt-2">
+                                {stageActions.map(act => (
+                                  <div key={act.id} className="flex flex-col bg-white/10 p-2 rounded border border-white/5">
+                                    <span className="text-[11px] font-bold text-white leading-tight">{act.acao}</span>
+                                    <div className="flex justify-between text-[9px] text-gray-300 mt-2 font-medium">
+                                      <span className="flex items-center gap-1"><User className="h-2.5 w-2.5 text-secondary"/> {act.responsavel}</span>
+                                      <span className="flex items-center gap-1"><Calendar className="h-2.5 w-2.5 text-secondary"/> {act.prazo.split('-').reverse().join('/')}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 border-[6px] border-transparent border-b-gray-800"></div>
+                            </div>
+                          )}
+
+                          {i === 1 ? (
+                            renderStage2Content(stage, weightedPct, metaPct, true)
                           ) : (
-                            <span className="text-[8px] text-muted-foreground/60 font-medium mt-0.5">Meta: {metaPct}%</span>
+                            renderStandardStage(weightedPct, metaPct, true)
                           )}
                         </div>
                       );
@@ -1223,8 +1600,13 @@ export default function OrderFulfillmentDashboard() {
                         <div className="grid bg-gray-100/50 hover:bg-gray-100 cursor-pointer border-b border-gray-200" style={{ gridTemplateColumns: gridTemplate }} onClick={() => toggleItem(exec.name, isExecExpanded)}>
                           <div className="p-3 pl-4 flex items-center min-w-0 border-r border-gray-200 border-l-4 border-primary">
                             <User className="h-5 w-5 text-primary shrink-0 mr-3" />
-                            <span className="font-black text-sm text-gray-800 uppercase tracking-tight truncate" title={exec.name}>{formatName(exec.name)}</span>
-                            <Badge variant="outline" className="ml-3 text-[10px] border-primary/30 text-primary/80 bg-white shadow-sm shrink-0">{exec.stats.totalErps} ERPs</Badge>
+                            <div className="flex flex-col flex-1 min-w-0 justify-center">
+                              <span className="font-black text-sm text-gray-800 uppercase tracking-tight truncate" title={exec.name}>{formatName(exec.name)}</span>
+                              <span className="text-[9px] font-bold text-muted-foreground/70 mt-0.5">{exec.stats.totalErps} ERPs</span>
+                            </div>
+                            <Badge variant="outline" className={`ml-3 text-[10px] font-black shadow-sm shrink-0 ${getBadgeStyle(getOverallAutomationPct(exec.stats.stages, activeAverageStages))}`}>
+                              {getOverallAutomationPct(exec.stats.stages, activeAverageStages)}% AUTO
+                            </Badge>
                             
                             <div className="ml-auto shrink-0 pl-2">{isExecExpanded ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}</div>
                           </div>
@@ -1248,16 +1630,14 @@ export default function OrderFulfillmentDashboard() {
                           {exec.stats.stages.map((stage: any, i: number) => {
                             const weightedPct = stage.totalOrders > 0 ? Math.round((stage.activeOrders / stage.totalOrders) * 100) : 0;
                             const metaPct = stage.totalOrders > 0 ? Math.round((stage.metaOrders / stage.totalOrders) * 100) : 0;
+                            const colBg = i % 2 !== 0 ? 'bg-black/[0.04]' : '';
+
                             return (
-                              <div key={i} className="p-2 flex flex-col items-center justify-center border-r border-gray-200">
-                                <span className={`text-xs font-bold ${getPctColorClass(weightedPct, metaPct)}`}>{weightedPct}%</span>
+                              <div key={i} className={`flex flex-col items-center justify-center border-r border-gray-200 h-full w-full ${colBg}`}>
                                 {i === 1 ? (
-                                  <div className="flex flex-col items-center mt-0.5">
-                                    <span className="text-[8px] text-muted-foreground/60 font-medium">Meta: {metaPct}%</span>
-                                    <span className="text-[8px] text-muted-foreground/70 font-semibold">{stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura</span>
-                                  </div>
+                                  renderStage2Content(stage, weightedPct, metaPct, false)
                                 ) : (
-                                  <span className="text-[8px] text-muted-foreground/60 font-medium mt-0.5">Meta: {metaPct}%</span>
+                                  renderStandardStage(weightedPct, metaPct, false)
                                 )}
                               </div>
                             );
@@ -1278,8 +1658,13 @@ export default function OrderFulfillmentDashboard() {
                                     <div className="p-3 border-r border-gray-100 flex items-center min-w-0" style={{ paddingLeft: '24px' }}>
                                       <div className="border-l-2 border-secondary pl-3 flex items-center w-full min-w-0">
                                         <Briefcase className="h-4 w-4 text-secondary shrink-0 mr-3" />
-                                        <span className="font-bold text-[11px] text-gray-700 uppercase truncate" title={port.name}>{port.name}</span>
-                                        <Badge variant="outline" className="ml-3 text-[9px] border-secondary/30 text-secondary/80 bg-secondary/5 shrink-0">{port.stats.totalErps} ERPs</Badge>
+                                        <div className="flex flex-col flex-1 min-w-0 justify-center pr-2">
+                                          <span className="font-bold text-[11px] text-gray-700 uppercase truncate" title={port.name}>{port.name}</span>
+                                          <span className="text-[8px] font-bold text-muted-foreground/70 mt-0.5">{port.stats.totalErps} ERPs</span>
+                                        </div>
+                                        <Badge variant="outline" className={`shrink-0 text-[9px] font-bold shadow-sm ${getBadgeStyle(getOverallAutomationPct(port.stats.stages, activeAverageStages))}`}>
+                                          {getOverallAutomationPct(port.stats.stages, activeAverageStages)}% AUTO
+                                        </Badge>
                                         
                                         <div className="ml-auto shrink-0 pl-2">{isPortExpanded ? <ChevronUp className="h-4 w-4 text-secondary" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}</div>
                                       </div>
@@ -1304,16 +1689,14 @@ export default function OrderFulfillmentDashboard() {
                                     {port.stats.stages.map((stage: any, i: number) => {
                                       const weightedPct = stage.totalOrders > 0 ? Math.round((stage.activeOrders / stage.totalOrders) * 100) : 0;
                                       const metaPct = stage.totalOrders > 0 ? Math.round((stage.metaOrders / stage.totalOrders) * 100) : 0;
+                                      const colBg = i % 2 !== 0 ? 'bg-black/[0.04]' : '';
+
                                       return (
-                                        <div key={i} className="p-2 flex flex-col items-center justify-center border-r border-gray-100">
-                                          <span className={`text-xs font-bold ${getPctColorClass(weightedPct, metaPct)}`}>{weightedPct}%</span>
+                                        <div key={i} className={`flex flex-col items-center justify-center border-r border-gray-100 h-full w-full ${colBg}`}>
                                           {i === 1 ? (
-                                            <div className="flex flex-col items-center mt-0.5">
-                                              <span className="text-[8px] text-muted-foreground/60 font-medium">Meta: {metaPct}%</span>
-                                              <span className="text-[8px] text-muted-foreground/70 font-semibold">{stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura</span>
-                                            </div>
+                                            renderStage2Content(stage, weightedPct, metaPct, false)
                                           ) : (
-                                            <span className="text-[8px] text-muted-foreground/60 font-medium mt-0.5">Meta: {metaPct}%</span>
+                                            renderStandardStage(weightedPct, metaPct, false)
                                           )}
                                         </div>
                                       );
@@ -1324,7 +1707,7 @@ export default function OrderFulfillmentDashboard() {
 
                                   {isPortExpanded && (
                                     <div className="flex flex-col">
-                                      {port.conglomerates.map((cong: any) => renderConglomerate(cong, portId, expandedItems, toggleItem, showProfile, hasActiveFilter, gridTemplate, false, handleUpdateSistema, handleUpdateErpSistema, obsContext))}
+                                      {port.conglomerates.map((cong: any) => renderConglomerate(cong, portId, expandedItems, toggleItem, showProfile, hasActiveFilter, gridTemplate, false, handleUpdateSistema, handleUpdateErpSistema, obsContext, entrySystems))}
                                     </div>
                                   )}
                                 </div>
@@ -1332,7 +1715,7 @@ export default function OrderFulfillmentDashboard() {
                             })}
 
                             {!groupByPortfolio && exec.conglomerates.map((cong: any) => 
-                              renderConglomerate(cong, exec.name, expandedItems, toggleItem, showProfile, hasActiveFilter, gridTemplate, true, handleUpdateSistema, handleUpdateErpSistema, obsContext)
+                              renderConglomerate(cong, exec.name, expandedItems, toggleItem, showProfile, hasActiveFilter, gridTemplate, true, handleUpdateSistema, handleUpdateErpSistema, obsContext, entrySystems)
                             )}
                           </div>
                         )}
@@ -1630,7 +2013,7 @@ export default function OrderFulfillmentDashboard() {
           
           <TabsContent value="configuracao" className="mt-0">
             {!isConfigAuthenticated ? renderPasswordScreen() : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-500">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-500 pb-12">
                 <Card className="shadow-lg border-primary/20">
                   <CardHeader className="bg-primary text-white rounded-t-lg">
                     <CardTitle className="text-xl flex items-center gap-2">
@@ -1667,6 +2050,155 @@ export default function OrderFulfillmentDashboard() {
                           <p className="text-[10px] text-muted-foreground/70 mt-1">Lê a Coluna C (Conglomerado), Coluna E (ERPs) e Coluna F (Sistema de Entrada).</p>
                         </>
                       )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-lg border-primary/20">
+                  <CardHeader className="bg-white border-b px-6 py-4 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl flex items-center gap-2 text-gray-800">
+                        <Target className="h-6 w-6 text-primary" /> Cálculo da Média Global
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">Selecione quais etapas devem compor o Índice de Automação (Média %) dos painéis.</p>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {stages.map((label, idx) => (
+                        <label key={idx} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${activeAverageStages.includes(idx) ? 'bg-primary/5 border-primary/30' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
+                          <input
+                            type="checkbox"
+                            className="accent-primary h-4 w-4 cursor-pointer"
+                            checked={activeAverageStages.includes(idx)}
+                            onChange={() => toggleAverageStage(idx)}
+                            disabled={activeAverageStages.length === 1 && activeAverageStages.includes(idx)}
+                          />
+                          <div className="flex flex-col">
+                            <span className={`text-sm font-bold ${activeAverageStages.includes(idx) ? 'text-primary' : 'text-gray-600'}`}>Etapa {idx + 1}</span>
+                            <span className="text-[10px] text-muted-foreground">{label}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-lg border-primary/20 lg:col-span-2">
+                  <CardHeader className="bg-white border-b px-6 py-4 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl flex items-center gap-2 text-gray-800">
+                        <Target className="h-6 w-6 text-primary" /> Planos de Ação por Etapa
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">Cadastre ações em andamento para alavancar a automação. Elas aparecerão como dicas (tooltips) na linha de Total Global.</p>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row gap-4 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
+                      <div className="flex-1 space-y-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Etapa Afetada</label>
+                        <select value={apEtapa} onChange={e => setApEtapa(e.target.value)} className="w-full text-xs border border-gray-300 rounded-md px-3 h-9 outline-none focus:ring-1 focus:ring-primary focus:border-primary bg-white cursor-pointer font-medium text-gray-700 shadow-sm">
+                          {stages.map((s, i) => <option key={i} value={i}>Etapa {i+1}: {s}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-[2] space-y-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ação em Andamento</label>
+                        <input type="text" value={apAcao} onChange={e => setApAcao(e.target.value)} placeholder="Ex: Mapeamento da nova API de pedidos..." className="w-full text-xs border border-gray-300 rounded-md px-3 h-9 outline-none focus:ring-1 focus:ring-primary focus:border-primary font-medium text-gray-700 shadow-sm" />
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Responsável</label>
+                        <input type="text" value={apResp} onChange={e => setApResp(e.target.value)} placeholder="Ex: João Silva" className="w-full text-xs border border-gray-300 rounded-md px-3 h-9 outline-none focus:ring-1 focus:ring-primary focus:border-primary font-medium text-gray-700 shadow-sm" />
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Prazo Estimado</label>
+                        <input type="date" value={apPrazo} onChange={e => setApPrazo(e.target.value)} className="w-full text-xs border border-gray-300 rounded-md px-3 h-9 outline-none focus:ring-1 focus:ring-primary focus:border-primary bg-white font-medium text-gray-700 shadow-sm cursor-pointer" />
+                      </div>
+                      <div className="flex items-end">
+                        <Button size="sm" className="h-9 w-full md:w-auto px-6 text-xs font-bold shadow-sm" onClick={handleAddActionPlan}>Adicionar Plano</Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {actionPlans.length === 0 && <div className="text-sm text-muted-foreground italic col-span-full py-4 text-center">Nenhuma ação em andamento cadastrada até o momento.</div>}
+                      {actionPlans.map(act => (
+                        <div key={act.id} className="border border-gray-200 rounded-xl p-4 relative group hover:border-primary/50 transition-colors bg-white shadow-sm hover:shadow-md">
+                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full" onClick={() => removeActionPlan(act.id)} title="Excluir Plano">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <Badge variant="outline" className="text-[9px] mb-3 bg-gray-50/80 text-gray-600 border-gray-200 shadow-none font-bold uppercase tracking-widest px-2 py-0.5">Etapa {act.etapaIdx + 1}</Badge>
+                          <p className="text-sm font-black text-gray-800 leading-tight mb-4 pr-6">{act.acao}</p>
+                          <div className="flex flex-col gap-1.5 border-t pt-3">
+                            <div className="flex justify-between items-center text-[11px] text-gray-600 font-medium">
+                              <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-primary" /> Responsável:</span>
+                              <span className="font-bold text-gray-800">{act.responsavel}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px] text-gray-600 font-medium">
+                              <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-primary" /> Prazo:</span>
+                              <span className="font-bold text-gray-800">{act.prazo.split('-').reverse().join('/')}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-lg border-primary/20">
+                  <CardHeader className="bg-white border-b px-6 py-4 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl flex items-center gap-2 text-gray-800">
+                        <Database className="h-6 w-6 text-primary" /> Sistemas de Entrada (Etapa 1)
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">Gerencie quais ferramentas são aceitas e se são consideradas Automáticas ou Manuais.</p>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-2">
+                        {Object.entries(entrySystems).sort().map(([name, isAuto]) => (
+                          <div key={name} className="flex items-center justify-between p-2 bg-gray-50 border rounded-md group">
+                            <span className="text-sm font-medium text-gray-700">{name}</span>
+                            <div className="flex items-center gap-3">
+                              <Button 
+                                variant={isAuto ? "default" : "outline"} 
+                                size="sm" 
+                                className="h-7 text-[10px] uppercase font-bold"
+                                onClick={() => updateEntrySystem(name, !isAuto)}
+                              >
+                                {isAuto ? "Automático" : "Manual"}
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => removeEntrySystem(name)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="pt-4 border-t flex gap-2">
+                        <input 
+                          id="newSystemName"
+                          type="text" 
+                          placeholder="Nome do novo sistema..."
+                          className="flex-1 text-sm border rounded-md px-3 h-9 outline-none focus:ring-1 focus:ring-primary"
+                        />
+                        <Button size="sm" onClick={() => {
+                          const input = document.getElementById('newSystemName') as HTMLInputElement;
+                          if (input.value.trim()) {
+                            updateEntrySystem(input.value.trim(), false);
+                            input.value = "";
+                          }
+                        }}>
+                          Adicionar
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1800,7 +2332,7 @@ export default function OrderFulfillmentDashboard() {
                         <h4 className="font-bold text-gray-800">Tratamento de Rupturas</h4>
                       </div>
                       <div className="text-sm text-gray-600 space-y-2">
-                        <p><strong>A Matemática (% AUTO):</strong> Divide as trocas feitas pelo "Sistema" pelo total de trocas de itens ocorridas nos últimos 30 dias (Sistema + Manual). Exemplo: 80% AUTO significa que a cada 10 itens trocados na cotação, 8 foram resolvidos por automação.</p>
+                        <p><strong>A Matemática (% AUTO):</strong> Pondera o volume de pedidos dos clientes que Aceitam Troca Automática em relação à carteira. Expandindo a linha do cliente, você visualiza o histórico de trocas automáticas vs manuais.</p>
                         <p><strong>O Problema Base (% COM RUPTURA):</strong> É o número pequeno cinza. Ele divide a quantidade de pedidos que sofreram ruptura pela média total de pedidos do cliente. Serve para indicar se o problema afeta a base toda ou apenas uma fatia pequena.</p>
                       </div>
                     </div>
@@ -1834,7 +2366,7 @@ export default function OrderFulfillmentDashboard() {
   );
 }
 
-function renderConglomerate(cong: any, parentId: string, expandedItems: any, toggleItem: any, showProfile: boolean, hasActiveFilter: boolean, gridTemplate: string, isFlat: boolean = false, handleUpdateSistema: any, handleUpdateErpSistema: any, obsContext: any) {
+function renderConglomerate(cong: any, parentId: string, expandedItems: any, toggleItem: any, showProfile: boolean, hasActiveFilter: boolean, gridTemplate: string, isFlat: boolean = false, handleUpdateSistema: any, handleUpdateErpSistema: any, obsContext: any, entrySystems: Record<string, boolean>) {
   const congId = `${parentId}-${cong.name}`;
   const isCongExpanded = expandedItems[congId] ?? hasActiveFilter;
   const congPad = isFlat ? '24px' : '48px';
@@ -1879,7 +2411,13 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
         <div className="p-3 border-r border-gray-200 flex items-center min-w-0" style={{ paddingLeft: congPad }}>
           <div className={`border-l-2 ${congBorder} pl-3 flex items-center gap-3 w-full min-w-0`}>
             <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="font-bold text-[10px] text-gray-600 uppercase truncate flex-1" title={cong.name}>{cong.name}</span>
+            <div className="flex flex-col flex-1 min-w-0 justify-center pr-2">
+              <span className="font-bold text-[10px] text-gray-600 uppercase truncate" title={cong.name}>{cong.name}</span>
+              <span className="text-[8px] font-bold text-muted-foreground/70 mt-0.5">{cong.stats.totalErps} ERPs</span>
+            </div>
+            <Badge variant="outline" className={`shrink-0 text-[9px] font-bold shadow-sm ${getBadgeStyle(getOverallAutomationPct(cong.stats.stages, obsContext.activeAverageStages || [0,1,2,3,4,5]))}`}>
+              {getOverallAutomationPct(cong.stats.stages, obsContext.activeAverageStages || [0,1,2,3,4,5])}% AUTO
+            </Badge>
             <div className="shrink-0">{isCongExpanded ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}</div>
           </div>
         </div>
@@ -1903,33 +2441,32 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
         {cong.stats.stages.map((stage: any, i: number) => {
           const weightedPct = stage.totalOrders > 0 ? Math.round((stage.activeOrders / stage.totalOrders) * 100) : 0;
           const metaPct = stage.totalOrders > 0 ? Math.round((stage.metaOrders / stage.totalOrders) * 100) : 0;
+          const colBg = i % 2 !== 0 ? 'bg-black/[0.04]' : '';
           
           return (
-            <div key={i} className="p-2 flex flex-col items-center justify-center border-r border-gray-200 relative group">
-              <span className={`text-[11px] font-bold ${getPctColorClass(weightedPct, metaPct)}`}>{weightedPct}%</span>
-              
-              {i === 0 ? (
-                <select
-                  onClick={(e) => e.stopPropagation()} 
-                  onChange={(e) => handleUpdateSistema(cong.id, e.target.value)} 
-                  value={cong.sistemaEntrada || ""}
-                  className="text-[8px] mt-0.5 max-w-[80px] w-full bg-transparent outline-none cursor-pointer text-muted-foreground/80 hover:text-primary transition-colors border-b border-dashed border-transparent hover:border-primary text-center appearance-none truncate"
-                  title="Alterar Sistema Padrão"
-                >
-                  <option value="" className="text-gray-400 font-normal">
-                    {cong.predominantSystem ? `Maioria: ${cong.predominantSystem}` : 'Não Definido'}
-                  </option>
-                  {Object.keys(ENTRADA_SISTEMAS).map(sys => (
-                    <option key={sys} value={sys}>{sys}</option>
-                  ))}
-                </select>
-              ) : i === 1 ? (
-                <div className="flex flex-col items-center mt-0.5">
-                  <span className="text-[8px] text-muted-foreground/60 font-medium">Meta: {metaPct}%</span>
-                  <span className="text-[8px] text-muted-foreground/70 font-semibold">{stage.baseOrders > 0 ? Math.round((stage.rupturedOrders / stage.baseOrders) * 100) : 0}% com ruptura</span>
-                </div>
+            <div key={i} className={`relative flex flex-col items-center justify-center border-r border-gray-200 h-full w-full ${colBg}`}>
+              {i === 1 ? (
+                renderStage2Content(stage, weightedPct, metaPct, false)
               ) : (
-                <span className="text-[8px] text-muted-foreground/60 font-medium mt-0.5">Meta: {metaPct}%</span>
+                <>
+                  {renderStandardStage(weightedPct, metaPct, false)}
+                  {i === 0 && (
+                    <select
+                      onClick={(e) => e.stopPropagation()} 
+                      onChange={(e) => handleUpdateSistema(cong.id, e.target.value)} 
+                      value={cong.sistemaEntrada || ""}
+                      className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] max-w-[80px] w-full bg-transparent outline-none cursor-pointer text-muted-foreground/80 hover:text-primary transition-colors border-b border-dashed border-transparent hover:border-primary text-center appearance-none truncate"
+                      title="Alterar Sistema Padrão"
+                    >
+                      <option value="" className="text-gray-400 font-normal">
+                        {cong.predominantSystem ? `Maioria: ${cong.predominantSystem}` : 'Não Definido'}
+                      </option>
+                      {Object.keys(entrySystems).sort().map(sys => (
+                        <option key={sys} value={sys}>{sys}</option>
+                      ))}
+                    </select>
+                  )}
+                </>
               )}
             </div>
           );
@@ -1962,7 +2499,7 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
 
                   <div className="p-2 border-r flex flex-col items-center justify-center bg-gray-50/20">
                     {(() => {
-                      const isSLA = erp.metric?.utilizaJanela === "NAO";
+                      const isSLA = String(erp.metric?.utilizaJanela).toUpperCase() === "NAO";
                       const profileLabel = isSLA ? "SLA" : "JANELA";
                       const ProfileIcon = isSLA ? Target : Clock;
                       const colorClass = isSLA ? "text-blue-500" : "text-amber-500";
@@ -1980,19 +2517,19 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                       <div className="p-2 border-r bg-gray-50/10 flex flex-col items-center justify-center overflow-hidden">
                         {(() => {
                           const isEnd = erp.metric?.multiCdEnderecos === "SIM" || erp.metric?.multiCdEnderecos === "TRUE" || erp.metric?.multiCdEnderecos === "1" || erp.metric?.multiCdEnderecos === true;
-                          const isRup = erp.metric?.multiCdPedidos === "SIM" || erp.metric?.multiCdPedidos === "TRUE" || erp.metric?.multiCdPedidos === "1" || erp.metric?.multiCdPedidos === true;
+                          const isManual = erp.metric?.fatMultiCD === "SIM" || erp.metric?.fatMultiCD === "TRUE" || erp.metric?.fatMultiCD === "1" || erp.metric?.fatMultiCD === true;
                           
-                          if (isEnd) return <Badge variant="outline" className="text-[8px] border-secondary text-secondary bg-secondary/5 px-1 py-0 h-4 whitespace-nowrap">Auto | Endereço</Badge>;
-                          if (isRup) return <Badge variant="outline" className="text-[8px] border-primary text-primary bg-primary/5 px-1 py-0 h-4 whitespace-nowrap">Auto | Ruptura</Badge>;
+                          if (isEnd) return <Badge variant="outline" className="text-[8px] border-purple-200 text-purple-700 bg-purple-50 px-1 py-0 h-4 whitespace-nowrap">Multi CD | Automático</Badge>;
+                          if (isManual) return <Badge variant="outline" className="text-[8px] border-indigo-200 text-indigo-700 bg-indigo-50 px-1 py-0 h-4 whitespace-nowrap">Multi CD Pedido | Manual</Badge>;
                           
-                          return <span className="text-[8px] text-muted-foreground/50 font-semibold whitespace-nowrap">Manual | Pedido</span>;
+                          return <span className="text-[8px] text-muted-foreground/50 font-semibold whitespace-nowrap">Não é Multi CD</span>;
                         })()}
                       </div>
 
                       <div className="p-2 border-r bg-gray-50/10 flex flex-col items-center justify-center overflow-hidden">
                         {(() => {
                           const exigeOC = erp.metric?.naoLiberarPedidoSemOC === "SIM" || erp.metric?.naoLiberarPedidoSemOC === "TRUE" || erp.metric?.naoLiberarPedidoSemOC === "1";
-                          if (exigeOC) return <Badge variant="outline" className="text-[8px] border-amber-500 text-amber-600 bg-amber-50 px-1 py-0 h-4 whitespace-nowrap" title="Exige Ordem de Compra para liberar">Exige OC</Badge>;
+                          if (exigeOC) return <Badge variant="outline" className="text-[8px] border-amber-500 text-amber-600 bg-amber-50 px-1 py-0 h-4 whitespace-nowrap" title="Exige Ordem de Compra para liberar">Precisa de OC</Badge>;
                           return <span className="text-[8px] text-muted-foreground/50 font-semibold whitespace-nowrap" title="Não exige Ordem de Compra">Livre (Sem OC)</span>;
                         })()}
                       </div>
@@ -2019,6 +2556,7 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                       {[1, 2, 3, 4, 5, 6].map((step) => {
                         const i = step - 1;
                         const isException = erp.stats.stages[i].isException;
+                        const colBg = i % 2 !== 0 ? 'bg-black/[0.04]' : '';
 
                         let isStepActive = false;
                         let titleText = "MANUAL";
@@ -2031,19 +2569,11 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                           percentage = isStepActive ? 100 : 0;
                           statusText = isStepActive ? "AUTOMÁTICO" : "MANUAL";
                         } else if (step === 2) {
-                          const tAuto = erp.metric?.trocasAuto || 0;
-                          const tManual = erp.metric?.trocasManual || 0;
-                          const tTotal = tAuto + tManual;
-                          
-                          if (tTotal > 0) {
-                             percentage = Math.round((tAuto / tTotal) * 100);
-                             statusText = percentage === 100 ? "100% AUTO" : `${percentage}% AUTO`;
-                             titleText = `Trocas: ${tAuto} Sistema / ${tManual} Manuais`;
-                          } else {
-                             percentage = 0;
-                             statusText = "SEM TROCA";
-                             titleText = "Nenhuma troca registrada";
-                          }
+                          const aceitaTroca = erp.metric?.trocaAutomatica !== "NAO";
+                          isStepActive = aceitaTroca;
+                          percentage = isStepActive ? 100 : 0;
+                          statusText = isStepActive ? "AUTOMÁTICO" : "MANUAL";
+                          titleText = "Configuração do Cliente";
                         } else if (step === 3) {
                           isStepActive = erp.metric?.etapa2Ativo;
                           percentage = isStepActive ? 100 : 0;
@@ -2070,12 +2600,41 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                         if (percentage >= 95) barColor = 'bg-secondary';
                         else if (percentage >= 80) barColor = 'bg-amber-500';
                         
+                        if (step === 2) {
+                          return (
+                            <div key={step} className={`flex flex-col items-center justify-center border-r h-full w-full ${colBg}`}>
+                              {isException ? (
+                                <div className="flex flex-col items-center justify-center py-1 text-center w-full">
+                                  <span className="text-[7.5px] font-black opacity-0 uppercase tracking-tighter mb-0.5 select-none">-</span>
+                                  <Badge variant="outline" className="text-[9px] font-bold text-gray-400 bg-gray-50/80 border-dashed" title="Ignorado no cálculo da meta geral">N/A (Exceção)</Badge>
+                                </div>
+                              ) : (
+                                <div className="flex w-full h-full divide-x divide-gray-300/50">
+                                  <div className="flex-1 flex flex-col items-center justify-center px-1 py-1 overflow-hidden text-center">
+                                    <span className="text-[7.5px] font-black text-muted-foreground/50 uppercase tracking-tighter mb-0.5">Flag</span>
+                                    <span className={`text-[8px] font-bold ${percentage >= 95 ? 'text-secondary' : percentage >= 80 ? 'text-amber-500' : 'text-gray-800'} transition-colors w-full truncate`} title={titleText}>
+                                      {statusText}
+                                    </span>
+                                  </div>
+                                  <div className="flex-1 flex flex-col items-center justify-center px-1 py-1 overflow-hidden text-center bg-black/[0.03]">
+                                    <span className="text-[7.5px] font-black text-muted-foreground/50 uppercase tracking-tighter mb-0.5">Qtd Trocas</span>
+                                    <span className="text-[8px] text-muted-foreground/80 font-bold mt-0.5 truncate w-full" title={`Histórico: ${erp.metric?.trocasAuto || 0} Auto / ${erp.metric?.trocasManual || 0} Manuais`}>
+                                      <span className="text-secondary">{erp.metric?.trocasAuto || 0}</span> / <span className="text-amber-600">{erp.metric?.trocasManual || 0}</span>
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
                         return (
-                          <div key={step} className="p-3 flex items-center justify-center border-r">
+                          <div key={step} className={`relative px-1 pt-1 pb-3 flex flex-col items-center justify-center border-r h-full w-full ${colBg}`}>
+                            <span className="text-[7.5px] font-black opacity-0 uppercase tracking-tighter mb-0.5 select-none">-</span>
                             {isException ? (
                               <Badge variant="outline" className="text-[9px] font-bold text-gray-400 bg-gray-50/80 border-dashed" title="Ignorado no cálculo da meta geral">N/A (Exceção)</Badge>
                             ) : (
-                              <div className="flex flex-col items-center justify-center w-full max-w-[85px]">
+                              <div className="flex flex-col items-center justify-center w-full max-w-[85px] h-full">
                                 <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1.5" title={titleText}>
                                   <div className={`${barColor} h-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
                                 </div>
@@ -2085,20 +2644,22 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                                     onClick={(e) => e.stopPropagation()} 
                                     onChange={(e) => handleUpdateErpSistema(cong.id, erp.code, e.target.value)} 
                                     value={erp.erpSistemaProprio || ""}
-                                    className={`text-[8px] font-bold ${percentage >= 95 ? 'text-secondary' : percentage >= 80 ? 'text-amber-500' : 'text-gray-800'} w-full bg-transparent outline-none cursor-pointer hover:text-primary transition-colors border-b border-dashed border-transparent hover:border-primary text-center appearance-none truncate`}
+                                    className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-bold ${percentage >= 95 ? 'text-secondary' : percentage >= 80 ? 'text-amber-500' : 'text-gray-800'} w-full max-w-[80px] bg-transparent outline-none cursor-pointer hover:text-primary transition-colors border-b border-dashed border-transparent hover:border-primary text-center appearance-none truncate`}
                                     title={`Atual: ${titleText} (${statusText})`}
                                   >
                                     <option value="" className="text-gray-400 font-normal">
                                       {cong.sistemaEntrada ? cong.sistemaEntrada : 'Herdar do Pai'}
                                     </option>
-                                    {Object.keys(ENTRADA_SISTEMAS).map(sys => (
+                                    {Object.keys(entrySystems).sort().map(sys => (
                                       <option key={sys} value={sys} className="text-gray-800 font-normal">{sys}</option>
                                     ))}
                                   </select>
                                 ) : (
-                                  <span className={`text-[8px] font-bold ${percentage >= 95 ? 'text-secondary' : percentage >= 80 ? 'text-amber-500' : 'text-gray-800'} transition-colors text-center w-full truncate`} title={titleText}>
-                                    {statusText}
-                                  </span>
+                                  <div className="flex flex-col items-center justify-center w-full overflow-hidden">
+                                    <span className={`text-[8px] font-bold ${percentage >= 95 ? 'text-secondary' : percentage >= 80 ? 'text-amber-500' : 'text-gray-800'} transition-colors text-center w-full truncate`} title={titleText}>
+                                      {statusText}
+                                    </span>
+                                  </div>
                                 )}
                               </div>
                             )}
@@ -2109,7 +2670,7 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                       <div className="p-2 flex items-center justify-center border-r last:border-r-0 bg-gray-50/10">
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleToggleObs(erp.code); }}
-                          className={`p-1.5 rounded transition-colors ${hasObs || Object.keys(erp.excecoes || {}).some(k => erp.excecoes[k] === true) || erp.metric?.trocaAutomatica === "NAO" ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-gray-200 text-gray-400'}`}
+                          className={`p-1.5 rounded transition-colors ${hasObs || Object.keys(erp.excecoes || {}).some(k => erp.excecoes[k] === true) ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-gray-200 text-gray-400'}`}
                           title="Anotações e Exceções de Metas"
                         >
                           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -2138,11 +2699,11 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                           </div>
                         </div>
 
-                        {(Object.keys(erp.excecoes || {}).some(k => erp.excecoes[k] === true) || erp.metric?.trocaAutomatica === "NAO") ? (
+                        {Object.keys(erp.excecoes || {}).some(k => erp.excecoes[k] === true) ? (
                           <div className="flex gap-2 flex-wrap mt-1">
                             <span className="text-xs font-bold text-gray-500 mr-2 flex items-center"><Filter className="h-3 w-3 mr-1"/> Ignorado nas Metas:</span>
                             {["Entrada", "Rupturas", "Programação", "Ger. OV", "Liberação", "Ocorrências"].map((lbl, idx) => {
-                              const isExc = erp.excecoes?.[idx] || (idx === 1 && erp.metric?.trocaAutomatica === "NAO");
+                              const isExc = erp.excecoes?.[idx];
                               return isExc ? <Badge key={idx} variant="outline" className="text-[9px] bg-red-50 text-red-600 border-red-200">{lbl}</Badge> : null;
                             })}
                           </div>
@@ -2186,21 +2747,17 @@ function renderConglomerate(cong: any, parentId: string, expandedItems: any, tog
                         <div className="bg-white border border-gray-200 rounded-md p-4 mt-1">
                           <span className="text-xs font-bold text-gray-800 mb-3 flex items-center gap-2"><Filter className="h-3.5 w-3.5"/> Exceções (Remover da Meta)</span>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-2">
-                            {["Etapa 1 (Entrada)", "Etapa 2 (Rupturas)", "Etapa 3 (Programação)", "Etapa 4 (Ger. OV)", "Etapa 5 (Liberação)", "Etapa 6 (Ocorrências)"].map((lbl, idx) => {
-                              const isForced = idx === 1 && erp.metric?.trocaAutomatica === "NAO";
-                              return (
-                              <label key={idx} className={`flex items-center gap-2 text-[10px] font-bold text-gray-500 cursor-pointer hover:text-primary transition-colors ${isForced ? 'opacity-50' : ''}`}>
+                            {["Etapa 1 (Entrada)", "Etapa 2 (Rupturas)", "Etapa 3 (Programação)", "Etapa 4 (Ger. OV)", "Etapa 5 (Liberação)", "Etapa 6 (Ocorrências)"].map((lbl, idx) => (
+                              <label key={idx} className="flex items-center gap-2 text-[10px] font-bold text-gray-500 cursor-pointer hover:text-primary transition-colors">
                                 <input 
                                   type="checkbox" 
-                                  className="accent-primary h-3.5 w-3.5 cursor-pointer disabled:opacity-50"
-                                  checked={erp.excecoes?.[idx] === true || isForced}
-                                  disabled={isForced}
-                                  title={isForced ? "Exceção forçada pelo banco de dados (TrocaAutomatica = NAO)" : ""}
+                                  className="accent-primary h-3.5 w-3.5 cursor-pointer"
+                                  checked={erp.excecoes?.[idx] === true}
                                   onChange={(e) => obsContext.handleUpdateExcecao(cong.id, erp.code, erp.excecoes, idx, e.target.checked)}
                                 />
-                                {lbl} {isForced && "(Forçado)"}
+                                {lbl}
                               </label>
-                            )})}
+                            ))}
                           </div>
                         </div>
 
