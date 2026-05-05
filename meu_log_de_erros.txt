@@ -1947,3 +1947,113 @@
 [2026-04-30T19:38:13.790Z] Porta definida pelo IIS: \\.\pipe\8795ed55-0cdc-47d7-8ec4-daa3f4b18e4c
 [2026-04-30T19:38:14.678Z] App Next.js preparada (build lido com sucesso).
 [2026-04-30T19:38:14.844Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\8795ed55-0cdc-47d7-8ec4-daa3f4b18e4c
+[2026-04-30T20:33:36.426Z] --- INICIANDO O SERVIDOR ---
+[2026-04-30T20:33:36.544Z] Ambiente (dev): false
+[2026-04-30T20:33:36.545Z] Porta definida pelo IIS: \\.\pipe\abc32356-9504-4dcf-bf5b-e3ed2919c14e
+[2026-04-30T20:33:37.420Z] App Next.js preparada (build lido com sucesso).
+[2026-04-30T20:33:37.596Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\abc32356-9504-4dcf-bf5b-e3ed2919c14e
+[2026-05-01T10:00:02.504Z] --- INICIANDO O SERVIDOR ---
+[2026-05-01T10:00:02.626Z] Ambiente (dev): false
+[2026-05-01T10:00:02.627Z] Porta definida pelo IIS: \\.\pipe\3d9b96d7-efae-4961-a06f-491dbd352402
+[2026-05-01T10:00:03.514Z] App Next.js preparada (build lido com sucesso).
+[2026-05-01T10:00:03.678Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\3d9b96d7-efae-4961-a06f-491dbd352402
+[2026-05-01T15:03:01.594Z] --- INICIANDO O SERVIDOR ---
+[2026-05-01T15:03:01.715Z] Ambiente (dev): false
+[2026-05-01T15:03:01.715Z] Porta definida pelo IIS: \\.\pipe\8409ffbf-95f4-49c6-9380-1da93d1bf0de
+[2026-05-01T15:03:02.668Z] App Next.js preparada (build lido com sucesso).
+[2026-05-01T15:03:02.833Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\8409ffbf-95f4-49c6-9380-1da93d1bf0de
+[2026-05-01T20:33:36.677Z] --- INICIANDO O SERVIDOR ---
+[2026-05-01T20:33:36.796Z] Ambiente (dev): false
+[2026-05-01T20:33:36.797Z] Porta definida pelo IIS: \\.\pipe\de2154d5-33d4-4da0-a215-ce1e0e288af6
+[2026-05-01T20:33:37.694Z] App Next.js preparada (build lido com sucesso).
+[2026-05-01T20:33:37.856Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\de2154d5-33d4-4da0-a215-ce1e0e288af6
+[2026-05-02T12:53:15.963Z] --- INICIANDO O SERVIDOR ---
+[2026-05-02T12:53:16.082Z] Ambiente (dev): false
+[2026-05-02T12:53:16.082Z] Porta definida pelo IIS: \\.\pipe\8fd8a041-ba9b-4a32-b2bf-4531a4a60056
+[2026-05-02T12:53:16.986Z] App Next.js preparada (build lido com sucesso).
+[2026-05-02T12:53:17.151Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\8fd8a041-ba9b-4a32-b2bf-4531a4a60056
+[2026-05-04T10:00:02.850Z] --- INICIANDO O SERVIDOR ---
+[2026-05-04T10:00:03.073Z] Ambiente (dev): false
+[2026-05-04T10:00:03.074Z] Porta definida pelo IIS: \\.\pipe\d79f564a-5db7-4978-ba0a-3be0401efea6
+[2026-05-04T10:00:05.005Z] App Next.js preparada (build lido com sucesso).
+[2026-05-04T10:00:05.173Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\d79f564a-5db7-4978-ba0a-3be0401efea6
+[2026-05-04T11:24:43.923Z] --- INICIANDO O SERVIDOR ---
+[2026-05-04T11:24:44.043Z] Ambiente (dev): false
+[2026-05-04T11:24:44.044Z] Porta definida pelo IIS: \\.\pipe\4b1d7209-a664-4374-9599-f2b38e6c2d37
+[2026-05-04T11:24:44.945Z] App Next.js preparada (build lido com sucesso).
+[2026-05-04T11:24:45.113Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\4b1d7209-a664-4374-9599-f2b38e6c2d37
+[2026-05-04T12:38:32.349Z] --- INICIANDO O SERVIDOR ---
+[2026-05-04T12:38:32.562Z] Ambiente (dev): false
+[2026-05-04T12:38:32.563Z] Porta definida pelo IIS: \\.\pipe\ec24d396-4fdc-438d-af37-7b05628a1a4d
+[2026-05-04T12:38:34.404Z] App Next.js preparada (build lido com sucesso).
+[2026-05-04T12:38:34.567Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\ec24d396-4fdc-438d-af37-7b05628a1a4d
+[2026-05-04T13:49:28.807Z] --- INICIANDO O SERVIDOR ---
+[2026-05-04T13:49:28.931Z] Ambiente (dev): false
+[2026-05-04T13:49:28.931Z] Porta definida pelo IIS: \\.\pipe\8a1f8d9c-d90c-4105-bc78-35ce8f50c714
+[2026-05-04T13:49:29.832Z] App Next.js preparada (build lido com sucesso).
+[2026-05-04T13:49:29.995Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\8a1f8d9c-d90c-4105-bc78-35ce8f50c714
+[2026-05-04T15:03:02.422Z] --- INICIANDO O SERVIDOR ---
+[2026-05-04T15:03:02.630Z] Ambiente (dev): false
+[2026-05-04T15:03:02.631Z] Porta definida pelo IIS: \\.\pipe\79018a9c-0a14-42ff-9a65-ea5cac3b9d58
+[2026-05-04T15:03:04.476Z] App Next.js preparada (build lido com sucesso).
+[2026-05-04T15:03:04.645Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\79018a9c-0a14-42ff-9a65-ea5cac3b9d58
+[2026-05-04T16:48:57.317Z] --- INICIANDO O SERVIDOR ---
+[2026-05-04T16:48:57.441Z] Ambiente (dev): false
+[2026-05-04T16:48:57.441Z] Porta definida pelo IIS: \\.\pipe\e9afea7a-72ac-4a19-9358-24d5f7bdad3c
+[2026-05-04T16:48:58.371Z] App Next.js preparada (build lido com sucesso).
+[2026-05-04T16:48:58.538Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\e9afea7a-72ac-4a19-9358-24d5f7bdad3c
+[2026-05-04T17:44:24.545Z] --- INICIANDO O SERVIDOR ---
+[2026-05-04T17:44:24.783Z] Ambiente (dev): false
+[2026-05-04T17:44:24.783Z] Porta definida pelo IIS: \\.\pipe\0e9a93bf-300d-4a3d-9b45-62e84b314c6d
+[2026-05-04T17:44:26.198Z] App Next.js preparada (build lido com sucesso).
+[2026-05-04T17:44:26.369Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\0e9a93bf-300d-4a3d-9b45-62e84b314c6d
+[2026-05-04T18:33:13.420Z] --- INICIANDO O SERVIDOR ---
+[2026-05-04T18:33:13.541Z] Ambiente (dev): false
+[2026-05-04T18:33:13.541Z] Porta definida pelo IIS: \\.\pipe\0203ce29-685e-4b5e-857b-2189becbc6ee
+[2026-05-04T18:33:14.436Z] App Next.js preparada (build lido com sucesso).
+[2026-05-04T18:33:14.598Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\0203ce29-685e-4b5e-857b-2189becbc6ee
+[2026-05-04T19:44:17.579Z] --- INICIANDO O SERVIDOR ---
+[2026-05-04T19:44:17.804Z] Ambiente (dev): false
+[2026-05-04T19:44:17.804Z] Porta definida pelo IIS: \\.\pipe\768cb5c9-17d2-4c43-ab03-197dbdb72946
+[2026-05-04T19:44:19.659Z] App Next.js preparada (build lido com sucesso).
+[2026-05-04T19:44:19.824Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\768cb5c9-17d2-4c43-ab03-197dbdb72946
+[2026-05-04T20:33:36.386Z] --- INICIANDO O SERVIDOR ---
+[2026-05-04T20:33:36.508Z] Ambiente (dev): false
+[2026-05-04T20:33:36.509Z] Porta definida pelo IIS: \\.\pipe\e65d3633-9b03-48ed-bae8-f03204ea5913
+[2026-05-04T20:33:37.399Z] App Next.js preparada (build lido com sucesso).
+[2026-05-04T20:33:37.565Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\e65d3633-9b03-48ed-bae8-f03204ea5913
+[2026-05-05T10:00:02.880Z] --- INICIANDO O SERVIDOR ---
+[2026-05-05T10:00:03.165Z] Ambiente (dev): false
+[2026-05-05T10:00:03.165Z] Porta definida pelo IIS: \\.\pipe\e66a898f-cfd9-43a6-8780-a7436d30b6ad
+[2026-05-05T10:00:05.086Z] App Next.js preparada (build lido com sucesso).
+[2026-05-05T10:00:05.251Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\e66a898f-cfd9-43a6-8780-a7436d30b6ad
+[2026-05-05T11:39:13.519Z] --- INICIANDO O SERVIDOR ---
+[2026-05-05T11:39:13.711Z] Ambiente (dev): false
+[2026-05-05T11:39:13.712Z] Porta definida pelo IIS: \\.\pipe\2dda3102-5060-45fd-b1be-1bc84c4fcb81
+[2026-05-05T11:39:14.947Z] App Next.js preparada (build lido com sucesso).
+[2026-05-05T11:39:15.117Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\2dda3102-5060-45fd-b1be-1bc84c4fcb81
+[2026-05-05T14:22:33.555Z] --- INICIANDO O SERVIDOR ---
+[2026-05-05T14:22:33.928Z] Ambiente (dev): false
+[2026-05-05T14:22:33.929Z] Porta definida pelo IIS: \\.\pipe\5d8a3af6-29d2-43d3-8976-106642f283ba
+[2026-05-05T14:22:36.213Z] App Next.js preparada (build lido com sucesso).
+[2026-05-05T14:22:36.382Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\5d8a3af6-29d2-43d3-8976-106642f283ba
+[2026-05-05T15:03:01.662Z] --- INICIANDO O SERVIDOR ---
+[2026-05-05T15:03:01.801Z] Ambiente (dev): false
+[2026-05-05T15:03:01.801Z] Porta definida pelo IIS: \\.\pipe\13801eef-5c62-4d16-a071-743bffa1521f
+[2026-05-05T15:03:02.768Z] App Next.js preparada (build lido com sucesso).
+[2026-05-05T15:03:02.943Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\13801eef-5c62-4d16-a071-743bffa1521f
+[2026-05-05T17:57:48.301Z] --- INICIANDO O SERVIDOR ---
+[2026-05-05T17:57:48.560Z] Ambiente (dev): false
+[2026-05-05T17:57:48.560Z] Porta definida pelo IIS: \\.\pipe\9ba997a1-a8df-4bd4-8ea9-f4114ec99e76
+[2026-05-05T17:57:50.432Z] App Next.js preparada (build lido com sucesso).
+[2026-05-05T17:57:50.598Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\9ba997a1-a8df-4bd4-8ea9-f4114ec99e76
+[2026-05-05T19:45:36.775Z] --- INICIANDO O SERVIDOR ---
+[2026-05-05T19:45:36.991Z] Ambiente (dev): false
+[2026-05-05T19:45:36.992Z] Porta definida pelo IIS: \\.\pipe\06f31ee3-a745-4eab-91fa-bcbcfa46e484
+[2026-05-05T19:45:38.821Z] App Next.js preparada (build lido com sucesso).
+[2026-05-05T19:45:38.994Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\06f31ee3-a745-4eab-91fa-bcbcfa46e484
+[2026-05-05T20:26:28.244Z] --- INICIANDO O SERVIDOR ---
+[2026-05-05T20:26:28.588Z] Ambiente (dev): false
+[2026-05-05T20:26:28.589Z] Porta definida pelo IIS: \\.\pipe\e9af4564-efd7-49df-8d1d-6e180b9f46f6
+[2026-05-05T20:26:30.325Z] App Next.js preparada (build lido com sucesso).
+[2026-05-05T20:26:30.487Z] > Servidor ativo a escutar no pipe/porta: \\.\pipe\e9af4564-efd7-49df-8d1d-6e180b9f46f6
