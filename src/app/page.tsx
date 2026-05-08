@@ -17,6 +17,7 @@ import { useFirestore, useCollection, useFirebaseApp } from "@/firebase";
 import { collection, doc, writeBatch, setDoc, getDocs, serverTimestamp, query, orderBy, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import { RupturasTab } from "@/components/dashboard/RupturasTab";
 
 const SENHA_ADMIN = "admin123"; 
 
@@ -980,7 +981,15 @@ export default function OrderFulfillmentDashboard() {
                 trocasManual: tManual,
                 trocasTotal: tTotal,
                 pctRuptura: pedidosTotal > 0 ? Math.round((pedidosRup / pedidosTotal) * 100) : 0,
-                pctManual: tTotal > 0 ? Math.round((tManual / tTotal) * 100) : 0
+                pctManual: tTotal > 0 ? Math.round((tManual / tTotal) * 100) : 0,
+                
+                // OS 4 NOVOS CAMPOS QUE VEM DO BANCO DINAMICAMENTE DE ACORDO COM O PERÍODO:
+                pedidosTrocaManual: hist.pedidosManual,
+                pedidosTrocaAuto: hist.pedidosAuto,
+                pedidos100Auto: hist.pedidos100Auto,
+                itens100Auto: hist.itens100Auto,
+                
+                itensDetalhados: erp.metric?.itensDetalhados || []
               });
             }
           });
@@ -1729,118 +1738,13 @@ export default function OrderFulfillmentDashboard() {
 
           <TabsContent value="rupturas" className="mt-0">
             {!isConfigAuthenticated ? renderPasswordScreen() : (
-              <div className="space-y-4 animate-in fade-in duration-300">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card className="shadow-sm border-l-4 border-l-amber-500">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Trabalho Manual ({periodo})</p>
-                        <h3 className="text-2xl font-black text-gray-800 mt-1">{formatNumber(rupturasRanking.reduce((acc, curr) => acc + curr.trocasManual, 0))} <span className="text-sm font-medium text-gray-500">trocas</span></h3>
-                      </div>
-                      <div className="p-3 bg-amber-50 rounded-full"><Activity className="h-5 w-5 text-amber-500" /></div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="shadow-sm border-l-4 border-l-primary">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Pedidos Afetados ({periodo})</p>
-                        <h3 className="text-2xl font-black text-gray-800 mt-1">{formatNumber(rupturasRanking.reduce((acc, curr) => acc + curr.pedidosRuptura, 0))} <span className="text-sm font-medium text-gray-500">pedidos</span></h3>
-                      </div>
-                      <div className="p-3 bg-primary/10 rounded-full"><AlertTriangle className="h-5 w-5 text-primary" /></div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="shadow-sm border-l-4 border-l-secondary">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Eficiência do Sistema</p>
-                        <h3 className="text-2xl font-black text-gray-800 mt-1">
-                          {(() => {
-                            const tManual = rupturasRanking.reduce((acc, curr) => acc + curr.trocasManual, 0);
-                            const tAuto = rupturasRanking.reduce((acc, curr) => acc + curr.trocasAuto, 0);
-                            const total = tManual + tAuto;
-                            return total > 0 ? `${Math.round((tAuto / total) * 100)}%` : '0%';
-                          })()}
-                          <span className="text-sm font-medium text-gray-500 ml-1">Automático</span>
-                        </h3>
-                      </div>
-                      <div className="p-3 bg-secondary/10 rounded-full"><Cpu className="h-5 w-5 text-secondary" /></div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card className="shadow-lg border-primary/20 border-t-4 border-t-primary bg-white">
-                  <CardHeader className="bg-white border-b px-6 py-4 flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="text-xl flex items-center gap-2 text-gray-800">
-                        <TrendingDown className="h-6 w-6 text-primary" /> Ranking de Ofensores (Esforço Manual)
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground mt-1">Clientes ordenados pela quantidade de trocas feitas manualmente nos últimos {periodo.replace('D', ' dias')}.</p>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left">
-                        <thead className="text-[10px] text-muted-foreground uppercase bg-gray-50/80 border-b">
-                          <tr>
-                            <th className="px-6 py-3 font-bold">Hierarquia</th>
-                            <th className="px-6 py-3 font-bold">Cliente</th>
-                            <th className="px-6 py-3 font-bold text-center">Vol. Pedidos ({periodo})</th>
-                            <th className="px-6 py-3 font-bold text-center">Ped. c/ Ruptura</th>
-                            <th className="px-6 py-3 font-bold text-center text-primary">Trocas Sistema</th>
-                            <th className="px-6 py-3 font-bold text-center text-amber-600 bg-amber-50/50">Trocas Manuais</th>
-                            <th className="px-6 py-3 font-bold text-center">% Esforço Manual</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rupturasRanking.length === 0 ? (
-                            <tr>
-                              <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                                <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                                Nenhuma ruptura encontrada para os filtros atuais ou as rupturas estão marcadas como Exceção.
-                              </td>
-                            </tr>
-                          ) : (
-                            rupturasRanking.map((row: any, idx: number) => (
-                              <tr key={`${row.erpCode}-${idx}`} className="border-b last:border-b-0 hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-3 whitespace-nowrap text-xs text-gray-500 font-medium">
-                                  {formatName(row.executivo)}
-                                </td>
-                                <td className="px-6 py-3 max-w-[200px] truncate" title={row.cliente}>
-                                  <span className="font-bold text-gray-800">{row.cliente}</span>
-                                  <span className="block text-[10px] text-primary font-mono mt-0.5">{row.erpCode}</span>
-                                </td>
-                                <td className="px-6 py-3 text-center font-semibold text-gray-600">
-                                  {formatNumber(row.pedidosTotal)}
-                                </td>
-                                <td className="px-6 py-3 text-center">
-                                  <div className="flex flex-col items-center justify-center">
-                                    <span className="font-bold text-gray-800">{formatNumber(row.pedidosRuptura)}</span>
-                                    <span className="text-[9px] text-muted-foreground font-semibold">{row.pctRuptura}% da base</span>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-3 text-center font-bold text-primary">
-                                  {formatNumber(row.trocasAuto)}
-                                </td>
-                                <td className="px-6 py-3 text-center font-black text-amber-600 bg-amber-50/20 text-lg">
-                                  {formatNumber(row.trocasManual)}
-                                </td>
-                                <td className="px-6 py-3 text-center">
-                                  <Badge variant="outline" className={`text-[10px] font-bold ${row.pctManual >= 50 ? 'bg-red-50 text-red-600 border-red-200' : row.pctManual > 0 ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                                    {row.pctManual}% MANUAL
-                                  </Badge>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <RupturasTab 
+                periodo={periodo} 
+                setPeriodo={setPeriodo} // <--- Adicione esta linha
+                rupturasRanking={rupturasRanking} 
+                formatNumber={formatNumber} 
+                formatName={formatName} 
+              />
             )}
           </TabsContent>
 

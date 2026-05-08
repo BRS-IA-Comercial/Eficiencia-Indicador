@@ -127,6 +127,8 @@ export async function POST(request: Request) {
         avgOrders3M: Number(item.Historico_30D?.Orders) || 0,
         avgRob3M: Number(item.Historico_30D?.ROB) || 0,
 
+        itensDetalhados: item.ItensDetalhados || [],
+
         isAtivo: item.Situacao === "Ativo" || item.isAtivo !== false,
         updatedAt: serverTimestamp()
       }, { merge: true });
