@@ -90,7 +90,8 @@ ResumoTrocas AS (
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN CotacaoID END) AS pedManual_30D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN CotacaoID END) AS pedAuto_30D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN CotacaoID END) AS ped100Auto_30D,
-        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN QtdeReal ELSE 0 END) AS itens100Auto_30D,
+        -- ALTERADO AQUI: De QtdeReal para 1
+        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN 1 ELSE 0 END) AS itens100Auto_30D,
 
         -- 60 DIAS
         SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -60, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN 1 ELSE 0 END) AS trocasAuto_60D,
@@ -99,7 +100,8 @@ ResumoTrocas AS (
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -60, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN CotacaoID END) AS pedManual_60D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -60, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN CotacaoID END) AS pedAuto_60D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -60, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN CotacaoID END) AS ped100Auto_60D,
-        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -60, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN QtdeReal ELSE 0 END) AS itens100Auto_60D,
+        -- ALTERADO AQUI: De QtdeReal para 1
+        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -60, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN 1 ELSE 0 END) AS itens100Auto_60D,
 
         -- 90 DIAS
         SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -90, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN 1 ELSE 0 END) AS trocasAuto_90D,
@@ -108,7 +110,8 @@ ResumoTrocas AS (
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -90, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN CotacaoID END) AS pedManual_90D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -90, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN CotacaoID END) AS pedAuto_90D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -90, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN CotacaoID END) AS ped100Auto_90D,
-        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -90, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN QtdeReal ELSE 0 END) AS itens100Auto_90D
+        -- ALTERADO AQUI: De QtdeReal para 1
+        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -90, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN 1 ELSE 0 END) AS itens100Auto_90D
 
     FROM ItensTratados
     GROUP BY CdExtCliente
@@ -148,15 +151,17 @@ Write-Host "Dados extraídos com sucesso. Preparando envio..." -ForegroundColor 
 $ResultData = @()
 
 
-# --- 4. QUERY DE DETALHES (SOMENTE MANUAIS / 90 DIAS) ---
-Write-Host "Buscando detalhes dos itens (SOMENTE MANUAIS / 90 DIAS)..." -ForegroundColor Cyan
+# --- 4. QUERY DE DETALHES (MANUAIS E AUTO / 7 DIAS) ---
+Write-Host "Buscando detalhes dos itens (TODOS / 7 DIAS)..." -ForegroundColor Cyan
 
 $QueryDetalhes = @"
+SET DATEFORMAT dmy;
+
 SELECT 
     c.CdExtCliente,
     alt.CotacaoID as pedido,
     FORMAT(TRY_CAST(alt.DataHoraAlteracao AS DATETIME), 'dd/MM/yyyy HH:mm') as data,
-    'MANUAL' as tipo,
+    CASE WHEN alt.NmUsuAlteracao = 'Sistema' THEN 'AUTO' ELSE 'MANUAL' END as tipo,
     alt.ItemAntigo as codOriginal,
     alt.NmItemAntigo as original,
     alt.ItemNovo as codSubstituto,
@@ -167,8 +172,7 @@ SELECT
     INNER JOIN BR_Cliente_Cubo c ON p.ClienteID = c.ClienteID
     WHERE alt.TipoOperacao = 'Troca' 
   AND alt.ItemAntigo <> alt.ItemNovo 
-  AND alt.NmUsuAlteracao <> 'Sistema' 
-  AND TRY_CAST(alt.DataPedido AS DATETIME) >= DATEADD(day, -90, GETDATE())
+  AND TRY_CAST(alt.DataPedido AS DATETIME) >= DATEADD(day, -7, GETDATE())
   AND c.CdExtCliente IN ($sqlInClause)
 ORDER BY TRY_CAST(alt.DataPedido AS DATETIME) DESC
 "@
@@ -180,7 +184,6 @@ foreach ($Row in $ResultDetalhes) {
     $cd = $Row["CdExtCliente"].ToString().Trim()
     if (-not $ItensPorCliente.ContainsKey($cd)) { $ItensPorCliente[$cd] = @() }
     
-    # Podemos salvar até 150 itens manuais agora, porque removemos os automáticos pesados
     if ($ItensPorCliente[$cd].Count -lt 150) {
         $rawQtd = $Row["qtd"]
         $qtdVal = 0
@@ -239,6 +242,8 @@ foreach ($Row in $Result) {
         
         "Orders_Current" = if ($isAtivo) { [int]$Row["Orders_Current"] } else { 0 }
         "ROB_Current" = if ($isAtivo) { [double]$Row["ROB_Current"] } else { 0 }
+        "ordersCurrent" = if ($isAtivo) { [int]$Row["Orders_Current"] } else { 0 }
+        "robCurrent" = if ($isAtivo) { [double]$Row["ROB_Current"] } else { 0 }
         
         "Historico_30D" = @{
             "Orders" = if ($isAtivo) { [int]$Row["Orders_30D"] } else { 0 }
