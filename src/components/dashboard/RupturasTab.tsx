@@ -9,12 +9,13 @@ import {
   AlertTriangle, User, TrendingDown, ArrowDown, ChevronDown, ChevronUp, 
   ChevronsDown, ChevronsUp, Building2, Cpu, Package, ArrowRight, 
   CalendarDays, ShoppingCart, CheckCircle2, Calendar, ArrowUpDown, ArrowUp,
-  Files
+  Files, Download, Loader2
 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 interface RupturasTabProps {
   periodo: string;
-  setPeriodo: (v: "30D" | "60D" | "90D") => void;
+  setPeriodo: (v: "7D" | "15D" | "30D" | "60D" | "90D") => void;
   rupturasRanking: any[];
   formatNumber: (val: number) => string;
   formatName: (fullName: string) => string;
@@ -30,6 +31,7 @@ export function RupturasTab({
   
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'trocasManual', direction: 'desc' });
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleSort = (key: string) => {
     setSortConfig(prev => ({
@@ -44,34 +46,37 @@ export function RupturasTab({
   };
 
   const statsCalculated = useMemo(() => {
+    // TRAVA DE SEGURANÇA 1: Se não chegou nada ou não é array, devolve vazio sem quebrar
+    if (!rupturasRanking || !Array.isArray(rupturasRanking)) {
+      return {
+        executivos: [],
+        globais: { pedidosTotal: 0, pedidosRuptura: 0, itensRuptura: 0, trocasManual: 0, trocasAuto: 0, pedidosManual: 0, pedidosAuto: 0, pedidos100Auto: 0, itens100Auto: 0 }
+      };
+    }
+
     const execMap = new Map();
     
-    // Variáveis Globais para os 6 Cards
-    let sumPedidosTotal = 0;
-    let sumPedidosRuptura = 0;
-    let sumTrocasAuto = 0;
-    let sumTrocasManual = 0;
-    let sumPedidosManual = 0;
-    let sumPedidosAuto = 0;
-    let sumPedidos100Auto = 0;
-    let sumItens100Auto = 0;
+    let sumPedidosTotal = 0, sumPedidosRuptura = 0, sumTrocasAuto = 0, sumTrocasManual = 0;
+    let sumPedidosManual = 0, sumPedidosAuto = 0, sumPedidos100Auto = 0, sumItens100Auto = 0;
 
-    rupturasRanking.forEach(row => {
+    rupturasRanking.forEach(originalRow => {
+      // TRAVA DE SEGURANÇA 2: Criar uma cópia isolada para não mutar os dados do React/Firebase
+      const row = { ...originalRow };
+
       let itensList = [];
       if (Array.isArray(row.itensDetalhados)) {
         itensList = row.itensDetalhados;
       } else if (row.itensDetalhados && typeof row.itensDetalhados === 'object') {
         itensList = row.itensDetalhados.pedido ? [row.itensDetalhados] : Object.values(row.itensDetalhados);
       }
+      // Agora é seguro atribuir o array garantido
       row.itensDetalhados = itensList;
 
-      // Somatórios base
       sumPedidosTotal += row.pedidosTotal || 0;
       sumPedidosRuptura += row.pedidosRuptura || 0;
       sumTrocasAuto += row.trocasAuto || 0;
       sumTrocasManual += row.trocasManual || 0;
 
-      // Lógica de cálculo Direta (Se vier do Backend) ou Fallback (Calculado em memória)
       let pMan = row.pedidosTrocaManual;
       let pAuto = row.pedidosTrocaAuto;
       let p100 = row.pedidos100Auto;
@@ -83,64 +88,54 @@ export function RupturasTab({
         let countI100 = 0;
         
         row.itensDetalhados.forEach((it: any) => {
-          if (it.tipo === 'MANUAL') setMan.add(it.pedido);
-          if (it.tipo === 'AUTO') setAuto.add(it.pedido);
+          if (it?.tipo === 'MANUAL') setMan.add(it.pedido);
+          if (it?.tipo === 'AUTO') setAuto.add(it.pedido);
         });
 
         pMan = setMan.size;
         pAuto = setAuto.size;
         
         let countP100 = 0;
-        setAuto.forEach((id: any) => {
-          if (!setMan.has(id)) countP100++;
-        });
+        setAuto.forEach((id: any) => { if (!setMan.has(id)) countP100++; });
         p100 = countP100;
 
         row.itensDetalhados.forEach((it: any) => {
-          if (it.tipo === 'AUTO' && !setMan.has(it.pedido)) countI100 += (Number(it.qtd) || 1);
+          if (it?.tipo === 'AUTO' && !setMan.has(it.pedido)) countI100 += (Number(it?.qtd) || 1);
         });
         i100 = countI100;
 
-        // Fallback de aproximação caso a lista não traga o detalhe inteiro (limite de 1MB)
         if (pMan === 0 && row.trocasManual > 0) pMan = Math.min(row.pedidosRuptura, row.trocasManual);
         if (pAuto === 0 && row.trocasAuto > 0) pAuto = Math.min(row.pedidosRuptura, row.trocasAuto);
         if (p100 === 0 && row.trocasAuto > 0 && row.trocasManual === 0) p100 = row.pedidosRuptura;
         if (i100 === 0 && row.trocasAuto > 0 && row.trocasManual === 0) i100 = row.trocasAuto;
       }
 
-      sumPedidosManual += pMan;
-      sumPedidosAuto += pAuto;
-      sumPedidos100Auto += p100;
-      sumItens100Auto += i100;
+      sumPedidosManual += pMan; sumPedidosAuto += pAuto; sumPedidos100Auto += p100; sumItens100Auto += i100;
 
-      // Agrupamento hierárquico
-      if (!execMap.has(row.executivo)) {
-        execMap.set(row.executivo, {
-          name: row.executivo, pedidosTotal: 0, pedidosRuptura: 0, trocasAuto: 0, trocasManual: 0,
-          clientesMap: new Map()
-        });
+      // TRAVA DE SEGURANÇA 3: Garantir que executivo e cliente existam
+      const execName = row.executivo || "Não Informado";
+      const cliName = row.cliente || "Não Informado";
+
+      if (!execMap.has(execName)) {
+        execMap.set(execName, { name: execName, pedidosTotal: 0, pedidosRuptura: 0, trocasAuto: 0, trocasManual: 0, clientesMap: new Map() });
       }
       
-      const exec = execMap.get(row.executivo);
-      exec.pedidosTotal += row.pedidosTotal;
-      exec.pedidosRuptura += row.pedidosRuptura;
-      exec.trocasAuto += row.trocasAuto;
-      exec.trocasManual += row.trocasManual;
+      const exec = execMap.get(execName);
+      exec.pedidosTotal += row.pedidosTotal || 0; 
+      exec.pedidosRuptura += row.pedidosRuptura || 0;
+      exec.trocasAuto += row.trocasAuto || 0; 
+      exec.trocasManual += row.trocasManual || 0;
 
-      if (!exec.clientesMap.has(row.cliente)) {
-        exec.clientesMap.set(row.cliente, {
-          name: row.cliente, pedidosTotal: 0, pedidosRuptura: 0, trocasAuto: 0, trocasManual: 0,
-          erps: []
-        });
+      if (!exec.clientesMap.has(cliName)) {
+        exec.clientesMap.set(cliName, { name: cliName, pedidosTotal: 0, pedidosRuptura: 0, trocasAuto: 0, trocasManual: 0, erps: [] });
       }
 
-      const cli = exec.clientesMap.get(row.cliente);
-      cli.pedidosTotal += row.pedidosTotal;
-      cli.pedidosRuptura += row.pedidosRuptura;
-      cli.trocasAuto += row.trocasAuto;
-      cli.trocasManual += row.trocasManual;
-
-      cli.erps.push({ ...row });
+      const cli = exec.clientesMap.get(cliName);
+      cli.pedidosTotal += row.pedidosTotal || 0; 
+      cli.pedidosRuptura += row.pedidosRuptura || 0;
+      cli.trocasAuto += row.trocasAuto || 0; 
+      cli.trocasManual += row.trocasManual || 0;
+      cli.erps.push(row); // Empurra o row já sanitizado (com itensDetalhados como array)
     });
 
     const sortFn = (a: any, b: any) => {
@@ -167,30 +162,20 @@ export function RupturasTab({
         })).sort(sortFn)
       })).sort(sortFn),
       globais: {
-        pedidosTotal: sumPedidosTotal,
-        pedidosRuptura: sumPedidosRuptura,
-        itensRuptura: sumTrocasAuto + sumTrocasManual,
-        trocasManual: sumTrocasManual,
-        trocasAuto: sumTrocasAuto,
-        pedidosManual: sumPedidosManual,
-        pedidosAuto: sumPedidosAuto,
-        pedidos100Auto: sumPedidos100Auto,
-        itens100Auto: sumItens100Auto
+        pedidosTotal: sumPedidosTotal, pedidosRuptura: sumPedidosRuptura, itensRuptura: sumTrocasAuto + sumTrocasManual,
+        trocasManual: sumTrocasManual, trocasAuto: sumTrocasAuto, pedidosManual: sumPedidosManual,
+        pedidosAuto: sumPedidosAuto, pedidos100Auto: sumPedidos100Auto, itens100Auto: sumItens100Auto
       }
     };
   }, [rupturasRanking, sortConfig]);
 
   const { globais } = statsCalculated;
 
-  // Cálculos de Porcentagem dos Cards
   const pctPedidosRuptura = globais.pedidosTotal > 0 ? Math.round((globais.pedidosRuptura / globais.pedidosTotal) * 100) : 0;
-  
   const pctPedidosManual = globais.pedidosRuptura > 0 ? Math.round((globais.pedidosManual / globais.pedidosRuptura) * 100) : 0;
   const pctItensManual = globais.itensRuptura > 0 ? Math.round((globais.trocasManual / globais.itensRuptura) * 100) : 0;
-
   const pctPedidosAuto = globais.pedidosRuptura > 0 ? Math.round((globais.pedidosAuto / globais.pedidosRuptura) * 100) : 0;
   const pctItensAuto = globais.itensRuptura > 0 ? Math.round((globais.trocasAuto / globais.itensRuptura) * 100) : 0;
-
   const pctPedidos100Auto = globais.pedidosRuptura > 0 ? Math.round((globais.pedidos100Auto / globais.pedidosRuptura) * 100) : 0;
   const pctItens100Auto = globais.itensRuptura > 0 ? Math.round((globais.itens100Auto / globais.itensRuptura) * 100) : 0;
 
@@ -207,20 +192,104 @@ export function RupturasTab({
     const all: Record<string, boolean> = {};
     statsCalculated.executivos.forEach(exec => {
       all[exec.name] = true;
-      exec.clientes.forEach((cli: any) => {
-        all[`${exec.name}-${cli.name}`] = true;
-      });
+      exec.clientes.forEach((cli: any) => { all[`${exec.name}-${cli.name}`] = true; });
     });
     setExpandedItems(all);
   };
   const collapseAll = () => setExpandedItems({});
 
+  const exportToExcel = async () => {
+    try {
+      setIsExporting(true);
+      
+      const res = await fetch('/clientes/rupturas_analitico.json'); 
+      if (!res.ok) throw new Error("Arquivo não gerado. O script do banco rodou?");
+      const allItems = await res.json();
+
+      const days = parseInt(periodo.replace('D', ''));
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+
+      // Usar a verificação segura
+      const activeErps = new Set((rupturasRanking || []).map(r => r.erpCode));
+
+      const validItems = allItems.filter((item: any) => {
+        if (!activeErps.has(item.erpCode)) return false;
+        if (!item.dataTimestamp) return false;
+        
+        const itemDate = new Date(item.dataTimestamp);
+        return itemDate >= cutoffDate;
+      });
+
+      if (validItems.length === 0) {
+        alert(`Não há dados analíticos exportáveis para o filtro e período (${periodo}) selecionados.`);
+        return;
+      }
+
+      // ABA 1: VISÃO GERAL (Com todos os dados)
+      const rowsGeral = validItems.map((it: any) => ({
+        "Executivo": formatName(it.executivo || ""),
+        "Cliente": it.cliente || "",
+        "Cód. ERP": it.erpCode || "",
+        "Cliente ID": it.clienteId || "-", 
+        "Data da Troca": it.data || "-",
+        "Nº Pedido": it.pedido || "-",
+        "Tipo": it.tipo || "-",
+        "Cód. Original": it.codOriginal || "-",
+        "Item com Ruptura": it.original || "-",
+        "Cód. Substituto": it.codSubstituto || "-",
+        "Novo Item": it.substituto || "-",
+        "Qtd Trocada": it.qtd || 0
+      }));
+
+      // ABA 2: RESUMO DE TROCAS MANUAIS (Valores únicos)
+      const manuaisMap = new Map();
+      
+      validItems.forEach((it: any) => {
+        if (it.tipo === 'MANUAL') {
+          const uniqueKey = `${it.erpCode}_${it.codOriginal}_${it.codSubstituto}`;
+          
+          if (!manuaisMap.has(uniqueKey)) {
+            manuaisMap.set(uniqueKey, {
+              "Executivo": formatName(it.executivo || ""),
+              "Cliente": it.cliente || "",
+              "Cód. ERP": it.erpCode || "",
+              "Cliente ID": it.clienteId || "-", 
+              "Cód. Original": it.codOriginal || "-",
+              "Item com Ruptura": it.original || "-",
+              "Cód. Substituto": it.codSubstituto || "-",
+              "Novo Item": it.substituto || "-"
+            });
+          }
+        }
+      });
+      
+      const rowsManuais = Array.from(manuaisMap.values());
+
+      const workbook = XLSX.utils.book_new();
+      
+      const worksheetGeral = XLSX.utils.json_to_sheet(rowsGeral);
+      XLSX.utils.book_append_sheet(workbook, worksheetGeral, "Visão Geral");
+      
+      if (rowsManuais.length > 0) {
+        const worksheetManuais = XLSX.utils.json_to_sheet(rowsManuais);
+        XLSX.utils.book_append_sheet(workbook, worksheetManuais, "Trocas Manuais Únicas");
+      }
+
+      XLSX.writeFile(workbook, `Relatorio_Analitico_Rupturas_${periodo}.xlsx`);
+      
+    } catch (error) {
+      console.error("Erro ao gerar Excel:", error);
+      alert("Falha ao exportar. Verifique se o arquivo rupturas_analitico.json existe na pasta /public.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       
-      {/* 6 CARDS ANALÍTICOS (PEDIDOS VS ITENS) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        
         <Card className="p-4 shadow-sm border-l-4 border-gray-400 bg-white" title="Volume total de pedidos faturados.">
           <div className="flex justify-between items-center">
              <p className="text-[10px] font-bold text-muted-foreground uppercase">1. Total de Pedidos</p>
@@ -306,43 +375,35 @@ export function RupturasTab({
       </div>
 
       <div className="bg-surface-light shadow-xl rounded-lg border min-w-[1000px] overflow-x-auto">
-        
-        {/* HEADER COM ORDENAÇÃO E TOOLTIPS */}
         <div className="grid text-sm border-b bg-white rounded-t-lg" style={{ gridTemplateColumns: gridTemplate }}>
           <div className="p-3 font-bold text-muted-foreground uppercase text-xxs tracking-widest border-r border-gray-100 cursor-pointer hover:bg-gray-50 flex items-center justify-between transition-colors select-none" onClick={() => handleSort('name')} title="Organização hierárquica por Executivo > Cliente > Cód. ERP Mãe">
             <div className="flex items-center gap-2"><User className="h-3 w-3" /> Hierarquia / Cliente</div>
             {getSortIcon('name')}
           </div>
-          
-          <div className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-r border-white/20 uppercase cursor-pointer hover:bg-primary transition-colors select-none" onClick={() => handleSort('pedidosTotal')} title="Volume total de pedidos faturados no período selecionado">
+          <div className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-r border-white/20 uppercase cursor-pointer hover:bg-primary transition-colors select-none" onClick={() => handleSort('pedidosTotal')}>
             <div className="flex items-center justify-center w-full gap-1">Vol. Pedidos ({periodo}) {getSortIcon('pedidosTotal')}</div>
           </div>
-          
-          <div className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-r border-white/20 bg-black/[0.04] uppercase cursor-pointer hover:bg-primary transition-colors select-none" onClick={() => handleSort('pedidosRuptura')} title="Quantidade de pedidos que tiveram falta de estoque e precisaram de troca">
+          <div className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-r border-white/20 bg-black/[0.04] uppercase cursor-pointer hover:bg-primary transition-colors select-none" onClick={() => handleSort('pedidosRuptura')}>
             <div className="flex items-center justify-center w-full gap-1">Pedidos C/ Ruptura {getSortIcon('pedidosRuptura')}</div>
           </div>
-          
-          <div className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-r border-white/20 uppercase cursor-pointer hover:bg-primary transition-colors select-none" onClick={() => handleSort('trocasAuto')} title="Quantidade de itens substituídos automaticamente">
+          <div className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-r border-white/20 uppercase cursor-pointer hover:bg-primary transition-colors select-none" onClick={() => handleSort('trocasAuto')}>
             <div className="flex items-center justify-center w-full gap-1">Trocas Sistema {getSortIcon('trocasAuto')}</div>
           </div>
-          
-          <div className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-r border-white/20 bg-black/[0.04] uppercase cursor-pointer hover:bg-primary transition-colors select-none" onClick={() => handleSort('trocasManual')} title="Quantidade de itens substituídos manualmente por um humano">
+          <div className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center border-r border-white/20 bg-black/[0.04] uppercase cursor-pointer hover:bg-primary transition-colors select-none" onClick={() => handleSort('trocasManual')}>
             <div className="flex items-center justify-center w-full gap-1">Trocas Manuais {getSortIcon('trocasManual')}</div>
           </div>
-          
-          <div className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center uppercase cursor-pointer hover:bg-primary transition-colors select-none" onClick={() => handleSort('pctManual')} title="Percentual de esforço humano em relação ao total de trocas efetuadas">
+          <div className="bg-primary/90 text-white p-2 text-center font-bold text-[8px] flex flex-col items-center justify-center uppercase cursor-pointer hover:bg-primary transition-colors select-none" onClick={() => handleSort('pctManual')}>
             <div className="flex items-center justify-center w-full gap-1">% Esforço Manual {getSortIcon('pctManual')}</div>
           </div>
         </div>
 
-        {/* TOOLBAR COM FILTRO DE PERÍODO */}
         <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between sticky left-0 z-20">
           <div className="flex items-center gap-4">
             <span className="font-bold text-xxs uppercase tracking-widest flex items-center gap-2">
               <TrendingDown className="h-3 w-3 text-primary" /> Ranking de Ofensores
             </span>
             <div className="flex items-center border-l border-gray-600 pl-2 ml-1">
-              <Select value={periodo} onValueChange={(v: "30D" | "60D" | "90D") => setPeriodo(v)}>
+              <Select value={periodo} onValueChange={(v: "7D" | "15D" | "30D" | "60D" | "90D") => setPeriodo(v)}>
                 <SelectTrigger className="h-7 border-none bg-transparent hover:bg-white/5 focus:ring-0 px-2 shadow-none transition-colors rounded group gap-1.5 outline-none cursor-pointer">
                   <div className="flex items-center gap-1.5 text-[10px]">
                     <Calendar className="h-3 w-3 text-gray-400 group-hover:text-gray-300" />
@@ -351,6 +412,8 @@ export function RupturasTab({
                   </div>
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="7D">Últimos 7 Dias</SelectItem>
+                  <SelectItem value="15D">Últimos 15 Dias</SelectItem>
                   <SelectItem value="30D">Últimos 30 Dias</SelectItem>
                   <SelectItem value="60D">Últimos 60 Dias</SelectItem>
                   <SelectItem value="90D">Últimos 90 Dias</SelectItem>
@@ -359,6 +422,10 @@ export function RupturasTab({
             </div>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="h-7 text-[10px] bg-green-600 hover:bg-green-700 text-white border-green-500 transition-colors" onClick={exportToExcel} disabled={isExporting}>
+              {isExporting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Download className="h-3 w-3 mr-1" />} 
+              {isExporting ? 'Gerando...' : 'Exportar Analítico'}
+            </Button>
             <Button variant="outline" size="sm" className="h-7 text-[10px] bg-white/10 hover:bg-white/20 text-white border-white/20" onClick={expandAll}><ChevronsDown className="h-3 w-3 mr-1" /> Expandir Tudo</Button>
             <Button variant="outline" size="sm" className="h-7 text-[10px] bg-white/10 hover:bg-white/20 text-white border-white/20" onClick={collapseAll}><ChevronsUp className="h-3 w-3 mr-1" /> Recolher Tudo</Button>
           </div>
@@ -366,37 +433,36 @@ export function RupturasTab({
 
         <div className="max-h-[750px] overflow-y-auto bg-white relative">
           
-          {/* TOTAL GLOBAL */}
           <div className="grid border-b-2 border-gray-300 bg-gray-200/80 sticky top-0 z-10 backdrop-blur-sm" style={{ gridTemplateColumns: gridTemplate }}>
             <div className="p-3 pl-4 flex items-center border-r border-gray-300/50">
               <div className="flex flex-col flex-1 min-w-0 pr-2">
                 <span className="font-black text-lg text-gray-800 uppercase tracking-tight">TOTAL GLOBAL</span>
-                <span className="text-xs font-bold text-muted-foreground/70 mt-0.5">{rupturasRanking.length} ERPs Afetados</span>
+                <span className="text-xs font-bold text-muted-foreground/70 mt-0.5">{rupturasRanking?.length || 0} ERPs Afetados</span>
               </div>
-              <Badge variant="outline" className={`ml-3 shrink-0 text-lg px-3 py-1 font-black shadow-md ${getBadgeStyle(pctItensManual)}`} title={`${pctItensManual}% de todo o trabalho de ruptura foi feito por humanos.`}>
+              <Badge variant="outline" className={`ml-3 shrink-0 text-lg px-3 py-1 font-black shadow-md ${getBadgeStyle(pctItensManual)}`}>
                 {pctItensManual}% MANUAL
               </Badge>
             </div>
             
-            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-300/50" title={`Foram faturados ${formatNumber(globais.pedidosTotal)} pedidos no período de ${periodo}.`}>
+            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-300/50">
               <span className="font-bold text-sm text-gray-800">{formatNumber(globais.pedidosTotal)}</span>
             </div>
             
-            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-300/50 bg-black/[0.02]" title={`Destes pedidos, ${formatNumber(globais.pedidosRuptura)} sofreram com falta de estoque.`}>
+            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-300/50 bg-black/[0.02]">
               <span className="font-bold text-sm text-gray-800">{formatNumber(globais.pedidosRuptura)}</span>
               <span className="text-[9px] text-muted-foreground font-black">Impacto Geral</span>
             </div>
 
-            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-300/50" title={`${formatNumber(globais.trocasAuto)} trocas de itens foram resolvidas de forma automática pelo robô.`}>
+            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-300/50">
               <span className="font-bold text-sm text-secondary">{formatNumber(globais.trocasAuto)}</span>
               <span className="text-[9px] text-green-600 font-bold">{pctItensAuto}% de eficácia</span>
             </div>
 
-            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-300/50 bg-black/[0.02]" title={`Um total de ${formatNumber(globais.trocasManual)} trocas precisaram de intervenção manual da equipe.`}>
+            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-300/50 bg-black/[0.02]">
               <span className="font-black text-lg text-amber-600">{formatNumber(globais.trocasManual)}</span>
             </div>
 
-            <div className="flex flex-col items-center justify-center p-2" title={`${pctItensManual}% de Esforço Operacional Humano no período.`}>
+            <div className="flex flex-col items-center justify-center p-2">
               <span className={`font-black text-sm ${pctItensManual >= 50 ? 'text-red-600' : 'text-amber-600'}`}>{pctItensManual}%</span>
             </div>
           </div>
@@ -405,7 +471,7 @@ export function RupturasTab({
             {statsCalculated.executivos.length === 0 ? (
                <div className="p-12 text-center flex flex-col items-center justify-center text-muted-foreground">
                  <AlertTriangle className="h-10 w-10 mb-3 opacity-20" />
-                 <span className="font-bold text-lg">Nenhuma ruptura encontrada.</span>
+                 <span className="font-bold text-lg">Nenhuma ruptura encontrada para este filtro.</span>
                </div>
             ) : (
               statsCalculated.executivos.map((exec) => {
@@ -413,28 +479,30 @@ export function RupturasTab({
 
                 return (
                   <div key={exec.name} className="flex flex-col">
-                    {/* NÍVEL 1: EXECUTIVO */}
                     <div className="grid bg-gray-100/50 hover:bg-gray-100 cursor-pointer border-b border-gray-200" style={{ gridTemplateColumns: gridTemplate }} onClick={() => toggleItem(exec.name, isExecExpanded)}>
                       <div className="p-3 pl-4 flex items-center min-w-0 border-r border-gray-200 border-l-4 border-primary">
                         <User className="h-5 w-5 text-primary shrink-0 mr-3" />
                         <span className="font-black text-sm text-gray-800 uppercase truncate" title={`Executivo: ${exec.name}`}>{formatName(exec.name)}</span>
                         <div className="ml-auto shrink-0 pl-2">{isExecExpanded ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}</div>
                       </div>
-                      <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200" title={`Total de pedidos: ${formatNumber(exec.pedidosTotal)}`}>
+                      <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200">
                         <span className="font-bold text-xs text-gray-700">{formatNumber(exec.pedidosTotal)}</span>
                       </div>
-                      <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]" title={`${exec.pedidosRuptura} pedidos de clientes desta carteira sofreram ruptura.`}>
+                      <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]">
                         <span className="font-bold text-xs text-gray-800">{formatNumber(exec.pedidosRuptura)}</span>
                         <span className="text-[9px] text-muted-foreground font-semibold">{exec.pctRuptura}% da base</span>
                       </div>
-                      <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200" title={`${formatNumber(exec.trocasAuto)} itens trocados automaticamente.`}>
+                      <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200">
                         <span className="font-bold text-xs text-secondary">{formatNumber(exec.trocasAuto)}</span>
+                        <span className="text-[9px] text-green-600 font-bold">{(exec.trocasAuto + exec.trocasManual) > 0 ? Math.round((exec.trocasAuto / (exec.trocasAuto + exec.trocasManual)) * 100) : 0}% de eficácia</span>
                       </div>
-                      <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]" title={`${formatNumber(exec.trocasManual)} itens trocados manualmente pela equipe.`}>
+                      <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]">
                         <span className="font-black text-sm text-amber-600">{formatNumber(exec.trocasManual)}</span>
                       </div>
-                      <div className="flex flex-col items-center justify-center p-2" title={`A carteira deste executivo tem ${exec.pctManual}% de esforço manual em rupturas.`}>
-                        <Badge variant="outline" className={`text-[10px] font-bold ${getBadgeStyle(exec.pctManual)}`}>{exec.pctManual}% MANUAL</Badge>
+                      <div className="flex flex-col items-center justify-center p-2">
+                        <span className={`font-black text-sm ${exec.pctManual >= 50 ? 'text-red-600' : exec.pctManual > 0 ? 'text-amber-600' : 'text-gray-700'}`}>
+                          {exec.pctManual}%
+                        </span>
                       </div>
                     </div>
 
@@ -444,7 +512,6 @@ export function RupturasTab({
 
                       return (
                         <div key={cliId} className="flex flex-col">
-                          {/* NÍVEL 2: CLIENTE */}
                           <div className="grid bg-gray-50 hover:bg-gray-100 cursor-pointer border-b border-gray-100" style={{ gridTemplateColumns: gridTemplate }} onClick={() => toggleItem(cliId, isCliExpanded)}>
                             <div className="p-3 border-r border-gray-200 flex items-center min-w-0" style={{ paddingLeft: '24px' }}>
                               <div className="border-l-2 border-secondary pl-3 flex items-center gap-3 w-full min-w-0">
@@ -453,21 +520,24 @@ export function RupturasTab({
                                 <div className="ml-auto shrink-0 pl-2">{isCliExpanded ? <ChevronUp className="h-4 w-4 text-secondary" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}</div>
                               </div>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200" title={`Total de pedidos faturados: ${formatNumber(cli.pedidosTotal)}`}>
+                            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200">
                               <span className="font-bold text-xs text-gray-700">{formatNumber(cli.pedidosTotal)}</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]" title={`${cli.pedidosRuptura} pedidos deste cliente tiveram falta de item.`}>
+                            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]">
                               <span className="font-bold text-xs text-gray-800">{formatNumber(cli.pedidosRuptura)}</span>
                               <span className="text-[9px] text-muted-foreground font-semibold">{cli.pctRuptura}% da base</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200" title={`Trocas sistêmicas: ${formatNumber(cli.trocasAuto)} itens.`}>
+                            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200">
                               <span className="font-bold text-xs text-secondary">{formatNumber(cli.trocasAuto)}</span>
+                              <span className="text-[9px] text-green-600 font-bold">{(cli.trocasAuto + cli.trocasManual) > 0 ? Math.round((cli.trocasAuto / (cli.trocasAuto + cli.trocasManual)) * 100) : 0}% de eficácia</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]" title={`Trocas manuais (ofensor): ${formatNumber(cli.trocasManual)} itens.`}>
+                            <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]">
                               <span className="font-black text-sm text-amber-600">{formatNumber(cli.trocasManual)}</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center p-2" title={`As rupturas deste cliente exigem ${cli.pctManual}% de intervenção manual.`}>
-                              <Badge variant="outline" className={`text-[10px] font-bold ${getBadgeStyle(cli.pctManual)}`}>{cli.pctManual}% MANUAL</Badge>
+                            <div className="flex flex-col items-center justify-center p-2">
+                              <span className={`font-black text-sm ${cli.pctManual >= 50 ? 'text-red-600' : cli.pctManual > 0 ? 'text-amber-600' : 'text-gray-700'}`}>
+                                {cli.pctManual}%
+                              </span>
                             </div>
                           </div>
 
@@ -475,13 +545,12 @@ export function RupturasTab({
                             const erpId = `${cliId}-${erp.erpCode}`;
                             const isErpExpanded = expandedItems[erpId] ?? false;
                             
-                            // 🚀 FILTRO NO FRONTEND: Exibir apenas Itens Manuais no analítico
-                            const itensManuais = (erp.itensDetalhados || []).filter((it: any) => it.tipo === 'MANUAL');
+                            // SEGURO: A garantia que itensDetalhados é um array já foi feita lá no useMemo
+                            const itensManuais = (erp.itensDetalhados || []).filter((it: any) => it?.tipo === 'MANUAL');
                             const hasItens = itensManuais.length > 0;
 
                             return (
                               <div key={`${erpId}-${idx}`} className="flex flex-col">
-                                {/* NÍVEL 3: ERP */}
                                 <div className={`grid bg-white cursor-pointer border-b border-gray-100 ${hasItens ? 'hover:bg-primary/5' : ''}`} style={{ gridTemplateColumns: gridTemplate }} onClick={() => hasItens && toggleItem(erpId, isErpExpanded)}>
                                   <div className="p-3 border-r bg-gray-50/10 flex items-center min-w-0" style={{ paddingLeft: '48px' }}>
                                     <div className="border-l-2 border-gray-200 pl-3 flex items-center gap-2 w-full min-w-0">
@@ -493,30 +562,32 @@ export function RupturasTab({
                                       {hasItens && <div className="ml-auto shrink-0 pl-2">{isErpExpanded ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}</div>}
                                     </div>
                                   </div>
-                                  <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200" title={`Pedidos faturados sob este código ERP: ${formatNumber(erp.pedidosTotal)}`}>
+                                  <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200">
                                     <span className="font-bold text-xs text-gray-700">{formatNumber(erp.pedidosTotal)}</span>
                                   </div>
-                                  <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]" title={`${erp.pedidosRuptura} pedidos deste ERP tiveram ruptura.`}>
+                                  <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]">
                                     <span className="font-bold text-xs text-gray-800">{formatNumber(erp.pedidosRuptura)}</span>
                                     <span className="text-[9px] text-muted-foreground font-semibold">{erp.pctRuptura}% da base</span>
                                   </div>
-                                  <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200" title={`${formatNumber(erp.trocasAuto)} itens trocados via robô para este ERP.`}>
+                                  <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200">
                                     <span className="font-bold text-xs text-secondary">{formatNumber(erp.trocasAuto)}</span>
+                                    <span className="text-[9px] text-green-600 font-bold">{(erp.trocasAuto + erp.trocasManual) > 0 ? Math.round((erp.trocasAuto / (erp.trocasAuto + erp.trocasManual)) * 100) : 0}% de eficácia</span>
                                   </div>
-                                  <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]" title={`Atenção: ${formatNumber(erp.trocasManual)} itens trocados à mão neste ERP.`}>
+                                  <div className="flex flex-col items-center justify-center p-2 border-r border-gray-200 bg-black/[0.02]">
                                     <span className="font-black text-sm text-amber-600">{formatNumber(erp.trocasManual)}</span>
                                   </div>
-                                  <div className="flex flex-col items-center justify-center p-2" title={`Nível de esforço manual isolado deste ERP: ${erp.pctManual}%`}>
-                                    <Badge variant="outline" className={`text-[10px] font-bold ${getBadgeStyle(erp.pctManual)}`}>{erp.pctManual}% MANUAL</Badge>
+                                  <div className="flex flex-col items-center justify-center p-2">
+                                    <span className={`font-black text-sm ${erp.pctManual >= 50 ? 'text-red-600' : erp.pctManual > 0 ? 'text-amber-600' : 'text-gray-700'}`}>
+                                      {erp.pctManual}%
+                                    </span>
                                   </div>
                                 </div>
 
-                                {/* NÍVEL 4: TABELA DE ITENS (DETALHADA - APENAS MANUAIS) */}
                                 {isErpExpanded && hasItens && (
                                   <div className="bg-slate-50 border-b p-6 shadow-inner animate-in fade-in zoom-in-95 duration-200" style={{ paddingLeft: '72px' }}>
                                     <div className="flex items-center gap-2 mb-4">
                                       <Package className="h-5 w-5 text-primary" />
-                                      <h4 className="text-sm font-black text-gray-800 tracking-tight">Detalhamento de Itens Substituídos (Apenas Intervenções Manuais)</h4>
+                                      <h4 className="text-sm font-black text-gray-800 tracking-tight">Detalhamento (Apenas Intervenções Manuais na visualização)</h4>
                                     </div>
                                     <div className="overflow-x-auto bg-white rounded-lg border shadow-sm">
                                       <table className="w-full text-left text-sm">

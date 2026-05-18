@@ -44,6 +44,12 @@ WITH PedidosStats AS (
         SUM(CASE WHEN DtPedido >= DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) THEN 1 ELSE 0 END) as Orders_Current,
         SUM(CASE WHEN DtPedido >= DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) THEN ISNULL(VlrTotal, 0) ELSE 0 END) as ROB_Current,
         
+        SUM(CASE WHEN DtPedido >= DATEADD(day, -7, GETDATE()) THEN 1 ELSE 0 END) as Orders_7D,
+        SUM(CASE WHEN DtPedido >= DATEADD(day, -7, GETDATE()) THEN ISNULL(VlrTotal, 0) ELSE 0 END) as ROB_7D,
+
+        SUM(CASE WHEN DtPedido >= DATEADD(day, -15, GETDATE()) THEN 1 ELSE 0 END) as Orders_15D,
+        SUM(CASE WHEN DtPedido >= DATEADD(day, -15, GETDATE()) THEN ISNULL(VlrTotal, 0) ELSE 0 END) as ROB_15D,
+
         SUM(CASE WHEN DtPedido >= DATEADD(day, -30, GETDATE()) THEN 1 ELSE 0 END) as Orders_30D,
         SUM(CASE WHEN DtPedido >= DATEADD(day, -30, GETDATE()) THEN ISNULL(VlrTotal, 0) ELSE 0 END) as ROB_30D,
         
@@ -83,6 +89,24 @@ ItensTratados AS (
 ResumoTrocas AS (
     SELECT 
         CdExtCliente,
+        -- 7 DIAS
+        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -7, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN 1 ELSE 0 END) AS trocasAuto_7D,
+        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -7, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN 1 ELSE 0 END) AS trocasManual_7D,
+        COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -7, GETDATE()) THEN CotacaoID END) AS rupturas_7D,
+        COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -7, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN CotacaoID END) AS pedManual_7D,
+        COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -7, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN CotacaoID END) AS pedAuto_7D,
+        COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -7, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN CotacaoID END) AS ped100Auto_7D,
+        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -7, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN 1 ELSE 0 END) AS itens100Auto_7D,
+
+        -- 15 DIAS
+        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -15, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN 1 ELSE 0 END) AS trocasAuto_15D,
+        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -15, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN 1 ELSE 0 END) AS trocasManual_15D,
+        COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -15, GETDATE()) THEN CotacaoID END) AS rupturas_15D,
+        COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -15, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN CotacaoID END) AS pedManual_15D,
+        COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -15, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN CotacaoID END) AS pedAuto_15D,
+        COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -15, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN CotacaoID END) AS ped100Auto_15D,
+        SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -15, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN 1 ELSE 0 END) AS itens100Auto_15D,
+
         -- 30 DIAS
         SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN 1 ELSE 0 END) AS trocasAuto_30D,
         SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN 1 ELSE 0 END) AS trocasManual_30D,
@@ -90,7 +114,6 @@ ResumoTrocas AS (
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN CotacaoID END) AS pedManual_30D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN CotacaoID END) AS pedAuto_30D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN CotacaoID END) AS ped100Auto_30D,
-        -- ALTERADO AQUI: De QtdeReal para 1
         SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -30, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN 1 ELSE 0 END) AS itens100Auto_30D,
 
         -- 60 DIAS
@@ -100,7 +123,6 @@ ResumoTrocas AS (
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -60, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN CotacaoID END) AS pedManual_60D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -60, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN CotacaoID END) AS pedAuto_60D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -60, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN CotacaoID END) AS ped100Auto_60D,
-        -- ALTERADO AQUI: De QtdeReal para 1
         SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -60, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN 1 ELSE 0 END) AS itens100Auto_60D,
 
         -- 90 DIAS
@@ -110,7 +132,6 @@ ResumoTrocas AS (
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -90, GETDATE()) AND NmUsuAlteracao <> 'Sistema' THEN CotacaoID END) AS pedManual_90D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -90, GETDATE()) AND NmUsuAlteracao = 'Sistema' THEN CotacaoID END) AS pedAuto_90D,
         COUNT(DISTINCT CASE WHEN DataPedidoReal >= DATEADD(day, -90, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN CotacaoID END) AS ped100Auto_90D,
-        -- ALTERADO AQUI: De QtdeReal para 1
         SUM(CASE WHEN DataPedidoReal >= DATEADD(day, -90, GETDATE()) AND NmUsuAlteracao = 'Sistema' AND HasManual = 0 THEN 1 ELSE 0 END) AS itens100Auto_90D
 
     FROM ItensTratados
@@ -123,10 +144,19 @@ SELECT DISTINCT
     C.TrocaAutomatica,
     CASE WHEN J.QtdJanelas > 0 THEN 1 ELSE 0 END as TemJanelaMesAtual,
     ISNULL(P.Orders_Current, 0) as Orders_Current, ISNULL(P.ROB_Current, 0) as ROB_Current,
+    
+    ISNULL(P.Orders_7D, 0) as Orders_7D, ISNULL(P.ROB_7D, 0) as ROB_7D,
+    ISNULL(P.Orders_15D, 0) as Orders_15D, ISNULL(P.ROB_15D, 0) as ROB_15D,
     ISNULL(P.Orders_30D, 0) as Orders_30D, ISNULL(P.ROB_30D, 0) as ROB_30D,
     ISNULL(P.Orders_60D, 0) as Orders_60D, ISNULL(P.ROB_60D, 0) as ROB_60D,
     ISNULL(P.Orders_90D, 0) as Orders_90D, ISNULL(P.ROB_90D, 0) as ROB_90D,
     
+    ISNULL(T.trocasAuto_7D, 0) as trocasAuto_7D, ISNULL(T.trocasManual_7D, 0) as trocasManual_7D, ISNULL(T.rupturas_7D, 0) as rupturas_7D,
+    ISNULL(T.pedManual_7D, 0) as pedManual_7D, ISNULL(T.pedAuto_7D, 0) as pedAuto_7D, ISNULL(T.ped100Auto_7D, 0) as ped100Auto_7D, ISNULL(T.itens100Auto_7D, 0) as itens100Auto_7D,
+
+    ISNULL(T.trocasAuto_15D, 0) as trocasAuto_15D, ISNULL(T.trocasManual_15D, 0) as trocasManual_15D, ISNULL(T.rupturas_15D, 0) as rupturas_15D,
+    ISNULL(T.pedManual_15D, 0) as pedManual_15D, ISNULL(T.pedAuto_15D, 0) as pedAuto_15D, ISNULL(T.ped100Auto_15D, 0) as ped100Auto_15D, ISNULL(T.itens100Auto_15D, 0) as itens100Auto_15D,
+
     ISNULL(T.trocasAuto_30D, 0) as trocasAuto_30D, ISNULL(T.trocasManual_30D, 0) as trocasManual_30D, ISNULL(T.rupturas_30D, 0) as rupturas_30D,
     ISNULL(T.pedManual_30D, 0) as pedManual_30D, ISNULL(T.pedAuto_30D, 0) as pedAuto_30D, ISNULL(T.ped100Auto_30D, 0) as ped100Auto_30D, ISNULL(T.itens100Auto_30D, 0) as itens100Auto_30D,
     
@@ -150,15 +180,17 @@ Write-Host "Dados extraídos com sucesso. Preparando envio..." -ForegroundColor 
 
 $ResultData = @()
 
-
-# --- 4. QUERY DE DETALHES (MANUAIS E AUTO / 7 DIAS) ---
-Write-Host "Buscando detalhes dos itens (TODOS / 7 DIAS)..." -ForegroundColor Cyan
+# --- 4. QUERY DE DETALHES (GERAÇÃO DO ARQUIVO ANALÍTICO PARA O EXCEL E PARA A TELA) ---
+Write-Host "Buscando detalhes dos itens (90 DIAS para o Excel)..." -ForegroundColor Cyan
 
 $QueryDetalhes = @"
 SET DATEFORMAT dmy;
 
 SELECT 
+    c.ClienteID, -- NOVA COLUNA ADICIONADA AQUI
     c.CdExtCliente,
+    c.Cart_Executivo_Vendas as Executivo,
+    c.NmConglomerado as Conglomerado,
     alt.CotacaoID as pedido,
     FORMAT(TRY_CAST(alt.DataHoraAlteracao AS DATETIME), 'dd/MM/yyyy HH:mm') as data,
     CASE WHEN alt.NmUsuAlteracao = 'Sistema' THEN 'AUTO' ELSE 'MANUAL' END as tipo,
@@ -166,13 +198,14 @@ SELECT
     alt.NmItemAntigo as original,
     alt.ItemNovo as codSubstituto,
     alt.NmItemNovo as substituto,
-    alt.QtdeAntiga as qtd
+    alt.QtdeAntiga as qtd,
+    TRY_CAST(alt.DataPedido AS DATETIME) as DataPedidoReal
     FROM Tabela_Alteracao_Itens_Pedidos alt
     INNER JOIN Cubo_Pedido p ON alt.CotacaoID = p.CotacaoID
     INNER JOIN BR_Cliente_Cubo c ON p.ClienteID = c.ClienteID
     WHERE alt.TipoOperacao = 'Troca' 
   AND alt.ItemAntigo <> alt.ItemNovo 
-  AND TRY_CAST(alt.DataPedido AS DATETIME) >= DATEADD(day, -7, GETDATE())
+  AND TRY_CAST(alt.DataPedido AS DATETIME) >= DATEADD(day, -90, GETDATE())
   AND c.CdExtCliente IN ($sqlInClause)
 ORDER BY TRY_CAST(alt.DataPedido AS DATETIME) DESC
 "@
@@ -180,31 +213,56 @@ ORDER BY TRY_CAST(alt.DataPedido AS DATETIME) DESC
 $ResultDetalhes = Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Username $User -Password $Password -Query $QueryDetalhes -QueryTimeout 300 -ErrorAction Stop -TrustServerCertificate
 
 $ItensPorCliente = @{}
+$AllDetailsExcel = @()
+$Date7DaysAgo = (Get-Date).AddDays(-7)
+
 foreach ($Row in $ResultDetalhes) {
     $cd = $Row["CdExtCliente"].ToString().Trim()
-    if (-not $ItensPorCliente.ContainsKey($cd)) { $ItensPorCliente[$cd] = @() }
     
-    if ($ItensPorCliente[$cd].Count -lt 150) {
-        $rawQtd = $Row["qtd"]
-        $qtdVal = 0
-        if ($rawQtd -ne [System.DBNull]::Value -and -not [string]::IsNullOrWhiteSpace($rawQtd.ToString())) {
-            try { $qtdVal = [int][decimal]($rawQtd.ToString()) } catch { $qtdVal = 0 }
-        }
+    $rawQtd = $Row["qtd"]
+    $qtdVal = 0
+    if ($rawQtd -ne [System.DBNull]::Value -and -not [string]::IsNullOrWhiteSpace($rawQtd.ToString())) {
+        try { $qtdVal = [int][decimal]($rawQtd.ToString()) } catch { $qtdVal = 0 }
+    }
 
-        $itemDetail = @{
-            "pedido" = $Row["pedido"].ToString().Trim()
-            "data" = $Row["data"].ToString().Trim()
-            "tipo" = $Row["tipo"].ToString().Trim()
-            "codOriginal" = $Row["codOriginal"].ToString().Trim()
-            "original" = $Row["original"].ToString().Trim()
-            "codSubstituto" = $Row["codSubstituto"].ToString().Trim()
-            "substituto" = $Row["substituto"].ToString().Trim()
-            "qtd" = $qtdVal
+    $dataPedidoObj = $Row["DataPedidoReal"]
+
+    $itemDetail = @{
+        "executivo" = if ([DBNull]::Value.Equals($Row["Executivo"])) { "Não Informado" } else { $Row["Executivo"].ToString().Trim() }
+        "cliente" = if ([DBNull]::Value.Equals($Row["Conglomerado"])) { "Sem Nome" } else { $Row["Conglomerado"].ToString().Trim() }
+        "clienteId" = if ([DBNull]::Value.Equals($Row["ClienteID"])) { "-" } else { $Row["ClienteID"].ToString().Trim() } # NOVO CAMPO CAPTURADO
+        "erpCode" = $cd
+        "pedido" = $Row["pedido"].ToString().Trim()
+        "data" = $Row["data"].ToString().Trim()
+        "tipo" = $Row["tipo"].ToString().Trim()
+        "codOriginal" = $Row["codOriginal"].ToString().Trim()
+        "original" = $Row["original"].ToString().Trim()
+        "codSubstituto" = $Row["codSubstituto"].ToString().Trim()
+        "substituto" = $Row["substituto"].ToString().Trim()
+        "qtd" = $qtdVal
+        "dataTimestamp" = if ($dataPedidoObj -ne [System.DBNull]::Value) { $dataPedidoObj.ToString("yyyy-MM-ddTHH:mm:ss") } else { (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss") }
+    }
+
+    # Salva TUDO no array gigante para o Excel analítico
+    $AllDetailsExcel += $itemDetail
+
+    # Para a interface do painel web não ficar pesada, enviamos só os últimos 7 dias na tooltip (Max 150)
+    if ($dataPedidoObj -ne [System.DBNull]::Value -and $dataPedidoObj -ge $Date7DaysAgo) {
+        if (-not $ItensPorCliente.ContainsKey($cd)) { $ItensPorCliente[$cd] = @() }
+        if ($ItensPorCliente[$cd].Count -lt 150) {
+            $ItensPorCliente[$cd] += $itemDetail
         }
-        $ItensPorCliente[$cd] += $itemDetail
     }
 }
 
+# Cria a pasta public se não existir e salva o JSON analítico lá!
+$JsonPath = ".\public\rupturas_analitico.json"
+if (-not (Test-Path ".\public")) { New-Item -ItemType Directory -Path ".\public" | Out-Null }
+$AllDetailsExcel | ConvertTo-Json -Depth 5 -Compress | Out-File $JsonPath -Encoding UTF8
+
+Write-Host "Arquivo Analítico Base criado para o Excel com $($AllDetailsExcel.Count) linhas!" -ForegroundColor Yellow
+
+# --- 5. PREPARAÇÃO DO PAYLOAD DE DADOS PARA A API ---
 foreach ($Row in $Result) {
     $situacao = if ([DBNull]::Value.Equals($Row["Situacao"])) { "" } else { $Row["Situacao"].ToString().Trim() }
     $carteira = if ([DBNull]::Value.Equals($Row["NmCarteira"])) { "" } else { $Row["NmCarteira"].ToString().Trim() }
@@ -245,6 +303,28 @@ foreach ($Row in $Result) {
         "ordersCurrent" = if ($isAtivo) { [int]$Row["Orders_Current"] } else { 0 }
         "robCurrent" = if ($isAtivo) { [double]$Row["ROB_Current"] } else { 0 }
         
+        "Historico_7D" = @{
+            "Orders" = if ($isAtivo) { [int]$Row["Orders_7D"] } else { 0 }
+            "ROB" = if ($isAtivo) { [double]$Row["ROB_7D"] } else { 0 }
+            "trocasAuto" = if ($isAtivo) { [int]$Row["trocasAuto_7D"] } else { 0 }
+            "trocasManual" = if ($isAtivo) { [int]$Row["trocasManual_7D"] } else { 0 }
+            "pedidosComRuptura" = if ($isAtivo) { [int]$Row["rupturas_7D"] } else { 0 }
+            "pedidosManual" = if ($isAtivo) { [int]$Row["pedManual_7D"] } else { 0 }
+            "pedidosAuto" = if ($isAtivo) { [int]$Row["pedAuto_7D"] } else { 0 }
+            "pedidos100Auto" = if ($isAtivo) { [int]$Row["ped100Auto_7D"] } else { 0 }
+            "itens100Auto" = if ($isAtivo) { [int]$Row["itens100Auto_7D"] } else { 0 }
+        }
+        "Historico_15D" = @{
+            "Orders" = if ($isAtivo) { [int]$Row["Orders_15D"] } else { 0 }
+            "ROB" = if ($isAtivo) { [double]$Row["ROB_15D"] } else { 0 }
+            "trocasAuto" = if ($isAtivo) { [int]$Row["trocasAuto_15D"] } else { 0 }
+            "trocasManual" = if ($isAtivo) { [int]$Row["trocasManual_15D"] } else { 0 }
+            "pedidosComRuptura" = if ($isAtivo) { [int]$Row["rupturas_15D"] } else { 0 }
+            "pedidosManual" = if ($isAtivo) { [int]$Row["pedManual_15D"] } else { 0 }
+            "pedidosAuto" = if ($isAtivo) { [int]$Row["pedAuto_15D"] } else { 0 }
+            "pedidos100Auto" = if ($isAtivo) { [int]$Row["ped100Auto_15D"] } else { 0 }
+            "itens100Auto" = if ($isAtivo) { [int]$Row["itens100Auto_15D"] } else { 0 }
+        }
         "Historico_30D" = @{
             "Orders" = if ($isAtivo) { [int]$Row["Orders_30D"] } else { 0 }
             "ROB" = if ($isAtivo) { [double]$Row["ROB_30D"] } else { 0 }
@@ -301,7 +381,7 @@ foreach ($Row in $Result) {
 
 Write-Host "Processamento concluído. $( $ResultData.Count ) clientes preparados." -ForegroundColor Green
 
-# --- 5. ENVIO PARA A API DE SYNC ---
+# --- 6. ENVIO PARA A API DE SYNC ---
 if ($ResultData.Count -gt 0) {
     Write-Host "A iniciar o envio para a API em lotes..." -ForegroundColor Cyan
     
@@ -343,7 +423,7 @@ if ($ResultData.Count -gt 0) {
         }
     }
 
-    # --- 6. LIMPEZA DOS FANTASMAS ---
+    # --- 7. LIMPEZA DOS FANTASMAS ---
     Write-Host "A iniciar a limpeza de ERPs antigos (Fantasmas) no Firebase..." -ForegroundColor Cyan
 
     $cleanupBody = @{ action = "cleanup"; validIds = $ValidIds } | ConvertTo-Json -Depth 5 -Compress

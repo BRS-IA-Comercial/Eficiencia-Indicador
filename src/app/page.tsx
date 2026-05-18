@@ -6,7 +6,7 @@ import {
   Loader2, FileUp, Database, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp,
   User, Building2, Cpu, Server, Terminal, Clock, Target, SlidersHorizontal, AlertCircle, Briefcase, Code, Filter, X, Search,
   ArrowUpDown, ArrowUp, ArrowDown, Layers, Lock, KeyRound, History, ArrowUpRight, ArrowDownRight, Activity, Calendar, Menu,
-  MessageSquare, Edit3, AlertTriangle, TrendingDown, BookOpen, Info, HelpCircle
+MessageSquare, Edit3, AlertTriangle, TrendingDown, TrendingUp, BookOpen, Info, HelpCircle, Users
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,6 +18,8 @@ import { collection, doc, writeBatch, setDoc, getDocs, serverTimestamp, query, o
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import { RupturasTab } from "@/components/dashboard/RupturasTab";
+import dynamic from "next/dynamic";
+const EvolucaoTab = dynamic(() => import("@/components/dashboard/EvolucaoTab").then(mod => mod.EvolucaoTab), { ssr: false });
 
 const SENHA_ADMIN = "admin123"; 
 
@@ -234,7 +236,7 @@ type ActionPlan = {
 
 export default function OrderFulfillmentDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [periodo, setPeriodo] = useState<"30D" | "60D" | "90D">("30D");
+  const [periodo, setPeriodo] = useState<"7D" | "15D" | "30D" | "60D" | "90D">("30D");
 
   const [isImporting, setIsImporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -269,6 +271,7 @@ export default function OrderFulfillmentDashboard() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const [groupByPortfolio, setGroupByPortfolio] = useState(true);
+  const [showEmptyClients, setShowEmptyClients] = useState(false);
   const [logGroupMode, setLogGroupMode] = useState<LogGroupMode>('executivo');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'rob', direction: 'desc' });
   const [host, setHost] = useState<string>("");
@@ -300,6 +303,90 @@ export default function OrderFulfillmentDashboard() {
   const [apResp, setApResp] = useState("");
   const [apPrazo, setApPrazo] = useState("");
 
+  const [hcConfig, setHcConfig] = useState<any>({
+    horasMes: 220, // Horas úteis por mês trabalhadas por 1 funcionário
+    tempos: {
+      etapa1: {
+        "Supply Manager": 0,
+        "Painel Pré Pedidos Manual": 1.5,
+        "Painel Pré Pedidos Automático": 0,
+        "PDF": 15,
+        "PDF IA": 0,
+        "PDF - IA": 0,
+        "Importação Excel": 3,
+        "Importação Excel IA": 0,
+        "Webservice": 1
+      },
+      etapa2_rupturas: 1, // 1 min por item
+      etapa3_programacao: 3, // 3 min por pedido
+      etapa4_geracaoOV: 0.5, // 30 seg por pedido
+      etapa5_liberacao: 1, // 1 min por pedido
+      etapa6_ocorrencias: 10 // 10 min por chamado
+    }
+  });
+
+  // --- INÍCIO: ESTADOS DO IMPORTADOR DE HISTÓRICO ---
+  const [histMonth, setHistMonth] = useState("2025-09");
+  const [histData, setHistData] = useState("");
+  const [isImportingHist, setIsImportingHist] = useState(false);
+
+  const handleImportHistory = async () => {
+    if (!histData.trim() || !db) return;
+    setIsImportingHist(true);
+    try {
+      const lines = histData.trim().split('\n');
+      const records: any[] = [];
+      
+      lines.forEach(line => {
+        const cols = line.split('\t').map(c => c.trim());
+        if (cols.length >= 7) {
+          records.push({
+            gestor: cols[0],
+            etapa1: (parseFloat(cols[1].replace(',', '.')) || 0) * 100,
+            etapa3: (parseFloat(cols[2].replace(',', '.')) || 0) * 100,
+            etapa5: (parseFloat(cols[3].replace(',', '.')) || 0) * 100,
+            etapa4: (parseFloat(cols[4].replace(',', '.')) || 0) * 100,
+            etapa2: (parseFloat(cols[5].replace(',', '.')) || 0) * 100,
+            etapa6: (parseFloat(cols[6].replace(',', '.')) || 0) * 100,
+          });
+        }
+      });
+
+      if (records.length === 0) {
+        toast({ variant: "destructive", title: "Erro de Formato", description: "Nenhuma linha válida encontrada. Copie as colunas do Excel." });
+        return;
+      }
+
+      const docRef = doc(db, 'historico_evolucao', histMonth);
+      await setDoc(docRef, { records, updatedAt: serverTimestamp() }, { merge: true });
+      
+      toast({ title: "Histórico Salvo!", description: `Mês ${histMonth} importado com sucesso.` });
+      setHistData("");
+    } catch (err) {
+      console.error(err);
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao salvar no banco." });
+    } finally {
+      setIsImportingHist(false);
+    }
+  };
+  // --- FIM: ESTADOS DO IMPORTADOR ---
+
+  const updateHcTime = (type: string, key: string | null, value: string) => {
+    const numValue = parseFloat(value) || 0;
+    setHcConfig((prev: any) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      if (type === 'horasMes') next.horasMes = numValue;
+      else if (type === 'etapa1' && key) {
+        if (!next.tempos.etapa1) next.tempos.etapa1 = {};
+        next.tempos.etapa1[key] = numValue;
+      }
+      else next.tempos[type] = numValue;
+      
+      if (typeof window !== "undefined") localStorage.setItem('hcConfig', JSON.stringify(next));
+      return next;
+    });
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const db = useFirestore();
   const app = useFirebaseApp();
@@ -319,6 +406,24 @@ export default function OrderFulfillmentDashboard() {
       const savedAp = localStorage.getItem('actionPlansConfig');
       if (savedAp) {
         try { setActionPlans(JSON.parse(savedAp)); } catch (e) {}
+      }
+      const savedHc = localStorage.getItem('hcConfig');
+      if (savedHc) {
+        try { 
+            const parsed = JSON.parse(savedHc);
+            setHcConfig((prev: any) => ({
+                ...prev,
+                ...parsed,
+                tempos: {
+                    ...prev.tempos,
+                    ...(parsed.tempos || {}),
+                    etapa1: {
+                        ...prev.tempos.etapa1,
+                        ...(parsed.tempos?.etapa1 || {})
+                    }
+                }
+            }));
+        } catch (e) {}
       }
     }
   }, []);
@@ -385,10 +490,12 @@ export default function OrderFulfillmentDashboard() {
   const erpMappingsQuery = useMemo(() => query(collection(db, "erp_mappings"), orderBy("importedAt", "desc")), [db]);
   const cuboMetricsQuery = useMemo(() => query(collection(db, "cubo_metrics"), orderBy("updatedAt", "desc")), [db]);
   const logsQuery = useMemo(() => query(collection(db, "automation_logs"), orderBy("data", "desc"), limit(400)), [db]);
+  const historicoQuery = useMemo(() => query(collection(db, "historico_evolucao")), [db]);
 
   const { data: erpMappings, loading: isLoadingMappings } = useCollection(erpMappingsQuery);
   const { data: cuboMetrics, loading: isLoadingMetrics } = useCollection(cuboMetricsQuery);
   const { data: automationLogs, loading: isLoadingLogs } = useCollection(logsQuery);
+  const { data: historicoEvolucao, loading: isLoadingEvolucao } = useCollection(historicoQuery);
 
   const lastSyncDate = useMemo(() => {
     if (!cuboMetrics || cuboMetrics.length === 0) return null;
@@ -701,10 +808,6 @@ export default function OrderFulfillmentDashboard() {
     const execMap: Record<string, { name: string, portfolios: Record<string, { name: string, conglomerates: any[] }> }> = {};
     const metricMap: Record<string, any> = {};
     
-    let globalOrders3M = 0, globalRob3M = 0, globalOrdersCur = 0, globalRobCur = 0, globalErpsCount = 0;
-    
-    const globalStages = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0, trocasAuto: 0, trocasManual: 0 }));
-    
     cuboMetrics.forEach((m: any) => { metricMap[m.id] = m; });
 
     erpMappings.forEach((m: any) => {
@@ -778,7 +881,6 @@ export default function OrderFulfillmentDashboard() {
         if (filterEtapa6.length > 0 && !filterEtapa6.includes(etapa6Label)) return;
 
         congErpsCount++;
-        globalErpsCount++;
 
         let ord3M = 0, rob3M = 0, ordCur = 0, robCur = 0, rup3M = 0;
         let stagesForStats = Array(6).fill(null).map(() => ({ totalOrders: 0, activeOrders: 0, metaOrders: 0, rupturedOrders: 0, baseOrders: 0, trocasAuto: 0, trocasManual: 0, isException: false }));
@@ -799,7 +901,6 @@ export default function OrderFulfillmentDashboard() {
           rup3M = hist.pedidosComRuptura || 0; 
 
           congOrders3M += ord3M; congRob3M += rob3M; congOrdersCur += ordCur; congRobCur += robCur;
-          globalOrders3M += ord3M; globalRob3M += rob3M; globalOrdersCur += ordCur; globalRobCur += robCur;
 
           if (sistemaFinal) {
             systemWeights[sistemaFinal] = (systemWeights[sistemaFinal] || 0) + ord3M;
@@ -831,30 +932,18 @@ export default function OrderFulfillmentDashboard() {
               rupOrd = rup3M; 
               stageStatsCong[i].trocasAuto += hist.trocasAuto || 0;
               stageStatsCong[i].trocasManual += hist.trocasManual || 0;
-              globalStages[i].trocasAuto += hist.trocasAuto || 0;
-              globalStages[i].trocasManual += hist.trocasManual || 0;
             }
 
             let mOrd = isException ? 0 : tOrd; 
 
             stageStatsCong[i].totalOrders += tOrd;
-            globalStages[i].totalOrders += tOrd;
-            
             stageStatsCong[i].activeOrders += aOrd;
-            globalStages[i].activeOrders += aOrd;
-            
             stageStatsCong[i].metaOrders += mOrd;
-            globalStages[i].metaOrders += mOrd;
-
             stageStatsCong[i].rupturedOrders += rupOrd;
-            globalStages[i].rupturedOrders += rupOrd;
-            
             stageStatsCong[i].baseOrders += ord3M;
-            globalStages[i].baseOrders += ord3M;
 
             if (!isException && isActive) {
               stageStatsCong[i].active += 1;
-              globalStages[i].active += 1;
             }
 
             stagesForStats[i] = { totalOrders: tOrd, activeOrders: aOrd, metaOrders: mOrd, rupturedOrders: rupOrd, baseOrders: ord3M, trocasAuto: (i===1 ? hist.trocasAuto||0 : 0), trocasManual: (i===1 ? hist.trocasManual||0 : 0), isException: isException };
@@ -891,6 +980,9 @@ export default function OrderFulfillmentDashboard() {
       });
     });
 
+    let globalOrders3M = 0, globalRob3M = 0, globalOrdersCur = 0, globalRobCur = 0, globalErpsCount = 0;
+    const globalStages = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0, trocasAuto: 0, trocasManual: 0 }));
+
     const executives = Object.values(execMap).map(exec => {
       let execOrders3M = 0, execRob3M = 0, execOrdersCur = 0, execRobCur = 0, execTotalErps = 0;
       const stageStatsExec = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0, trocasAuto: 0, trocasManual: 0 }));
@@ -899,7 +991,12 @@ export default function OrderFulfillmentDashboard() {
         let portOrders3M = 0, portRob3M = 0, portOrdersCur = 0, portRobCur = 0, portTotalErps = 0;
         const stageStatsPort = Array(6).fill(null).map(() => ({ active: 0, total: 0, activeOrders: 0, metaOrders: 0, totalOrders: 0, rupturedOrders: 0, baseOrders: 0, trocasAuto: 0, trocasManual: 0 }));
 
-        port.conglomerates.forEach(cong => {
+        // 🚀 O SEGREDO ESTÁ AQUI: Só passa o cliente adiante se tiver pedidos ou se "Mostrar Zerados" estiver ativo
+        const validConglomerates = showEmptyClients 
+          ? port.conglomerates 
+          : port.conglomerates.filter((c: any) => c.stats.avgOrders3M > 0);
+
+        validConglomerates.forEach((cong: any) => {
           portOrders3M += cong.stats.avgOrders3M; portRob3M += cong.stats.avgRob3M;
           portOrdersCur += cong.stats.ordersCurrent; portRobCur += cong.stats.robCurrent;
           portTotalErps += cong.stats.totalErps;
@@ -907,6 +1004,10 @@ export default function OrderFulfillmentDashboard() {
           execOrders3M += cong.stats.avgOrders3M; execRob3M += cong.stats.avgRob3M;
           execOrdersCur += cong.stats.ordersCurrent; execRobCur += cong.stats.robCurrent;
           execTotalErps += cong.stats.totalErps;
+
+          globalOrders3M += cong.stats.avgOrders3M; globalRob3M += cong.stats.avgRob3M;
+          globalOrdersCur += cong.stats.ordersCurrent; globalRobCur += cong.stats.robCurrent;
+          globalErpsCount += cong.stats.totalErps;
 
           cong.stats.stages.forEach((stg: any, i: number) => {
             stageStatsPort[i].total += stg.total; stageStatsPort[i].active += stg.active;
@@ -926,10 +1027,19 @@ export default function OrderFulfillmentDashboard() {
             stageStatsExec[i].baseOrders += stg.baseOrders;
             stageStatsExec[i].trocasAuto += stg.trocasAuto || 0;
             stageStatsExec[i].trocasManual += stg.trocasManual || 0;
+
+            globalStages[i].total += stg.total; globalStages[i].active += stg.active;
+            globalStages[i].totalOrders += stg.totalOrders; 
+            globalStages[i].activeOrders += stg.activeOrders;
+            globalStages[i].metaOrders += stg.metaOrders;
+            globalStages[i].rupturedOrders += stg.rupturedOrders; 
+            globalStages[i].baseOrders += stg.baseOrders;
+            globalStages[i].trocasAuto += stg.trocasAuto || 0;
+            globalStages[i].trocasManual += stg.trocasManual || 0;
           });
         });
 
-        return { name: port.name, conglomerates: sortNodes(port.conglomerates), stats: { avgOrders3M: portOrders3M, avgRob3M: portRob3M, ordersCurrent: portOrdersCur, robCurrent: portRobCur, totalErps: portTotalErps, stages: stageStatsPort } };
+        return { name: port.name, conglomerates: sortNodes(validConglomerates), stats: { avgOrders3M: portOrders3M, avgRob3M: portRob3M, ordersCurrent: portOrdersCur, robCurrent: portRobCur, totalErps: portTotalErps, stages: stageStatsPort } };
       }).filter(port => port.stats.totalErps > 0);
 
       const allConglomerates: any[] = [];
@@ -944,7 +1054,7 @@ export default function OrderFulfillmentDashboard() {
     }).filter(exec => exec.stats.totalErps > 0);
 
     return { executives: sortNodes(executives), globalStats: { avgOrders3M: globalOrders3M, avgRob3M: globalRob3M, ordersCurrent: globalOrdersCur, robCurrent: globalRobCur, totalErps: globalErpsCount, stages: globalStages } };
-  }, [cuboMetrics, erpMappings, filterExecutivos, filterCarteiras, filterClientes, filterMultiCD, filterRegraOC, filterPerfil, filterEtapa1, filterEtapa2, filterEtapa3, filterEtapa4, filterEtapa5, filterEtapa6, sortConfig, sistemasOverrides, periodo, entrySystems]);
+  }, [cuboMetrics, erpMappings, filterExecutivos, filterCarteiras, filterClientes, filterMultiCD, filterRegraOC, filterPerfil, filterEtapa1, filterEtapa2, filterEtapa3, filterEtapa4, filterEtapa5, filterEtapa6, sortConfig, sistemasOverrides, periodo, entrySystems, showEmptyClients]);
 
   const rupturasRanking = useMemo(() => {
     if (!groupedData) return [];
@@ -1171,6 +1281,7 @@ export default function OrderFulfillmentDashboard() {
     switch (activeTab) {
       case 'dashboard': return 'Dashboard Operacional';
       case 'rupturas': return 'Análise de Rupturas';
+      case 'evolucao': return 'Evolução e Ganho de HC';
       case 'historico': return 'Auditoria de Automação';
       case 'configuracao': return 'Configurações de Painel';
       case 'documentacao': return 'Guia e Documentação';
@@ -1224,6 +1335,16 @@ export default function OrderFulfillmentDashboard() {
                       >
                         <AlertTriangle className="h-4 w-4" /> Análise de Rupturas
                       </button>
+
+                      {/* --- NOVO BOTÃO DE EVOLUÇÃO --- */}
+                      <button 
+                        onClick={() => { setActiveTab('evolucao'); setShowNavMenu(false); }} 
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-md transition-colors ${activeTab === 'evolucao' ? 'bg-primary/10 text-primary' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        <TrendingUp className="h-4 w-4" /> Evolução e HC
+                      </button>
+                      {/* ------------------------------ */}
+
                       <button 
                         onClick={() => { setActiveTab('historico'); setShowNavMenu(false); }} 
                         className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-md transition-colors ${activeTab === 'historico' ? 'bg-primary/10 text-primary' : 'text-gray-700 hover:bg-gray-100'}`}
@@ -1251,12 +1372,21 @@ export default function OrderFulfillmentDashboard() {
 
             <div className="flex items-center gap-3">
               {activeTab === 'dashboard' && (
-                <div className="flex items-center gap-2 bg-gray-50 border rounded-md px-3 py-1.5 h-10">
-                  <Layers className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-bold text-muted-foreground whitespace-nowrap mr-2">Agrupar Carteira:</span>
-                  <Button variant={groupByPortfolio ? "default" : "outline"} size="sm" className="h-6 px-3 text-[10px]" onClick={() => setGroupByPortfolio(true)}>Sim</Button>
-                  <Button variant={!groupByPortfolio ? "default" : "outline"} size="sm" className="h-6 px-3 text-[10px]" onClick={() => setGroupByPortfolio(false)}>Não</Button>
-                </div>
+                <>
+                  <div className="flex items-center gap-2 bg-gray-50 border rounded-md px-3 py-1.5 h-10 hidden md:flex" title="Ocultar clientes sem faturamento no período selecionado">
+                    <Filter className="h-4 w-4 text-primary" />
+                    <span className="text-xs font-bold text-muted-foreground whitespace-nowrap mr-2">Clientes Zerados:</span>
+                    <Button variant={!showEmptyClients ? "default" : "outline"} size="sm" className="h-6 px-3 text-[10px]" onClick={() => setShowEmptyClients(false)}>Ocultar</Button>
+                    <Button variant={showEmptyClients ? "default" : "outline"} size="sm" className="h-6 px-3 text-[10px]" onClick={() => setShowEmptyClients(true)}>Mostrar</Button>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 bg-gray-50 border rounded-md px-3 py-1.5 h-10">
+                    <Layers className="h-4 w-4 text-primary" />
+                    <span className="text-xs font-bold text-muted-foreground whitespace-nowrap mr-2">Agrupar Carteira:</span>
+                    <Button variant={groupByPortfolio ? "default" : "outline"} size="sm" className="h-6 px-3 text-[10px]" onClick={() => setGroupByPortfolio(true)}>Sim</Button>
+                    <Button variant={!groupByPortfolio ? "default" : "outline"} size="sm" className="h-6 px-3 text-[10px]" onClick={() => setGroupByPortfolio(false)}>Não</Button>
+                  </div>
+                </>
               )}
 
               <Button 
@@ -1475,7 +1605,7 @@ export default function OrderFulfillmentDashboard() {
                         <Clock className="h-3 w-3" /> Atualizado em: {new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(lastSyncDate)}
                       </span>
                       <div className="flex items-center border-l border-gray-600 pl-2 ml-1">
-                        <Select value={periodo} onValueChange={(v: "30D" | "60D" | "90D") => setPeriodo(v)}>
+                        <Select value={periodo} onValueChange={(v: "7D" | "15D" | "30D" | "60D" | "90D") => setPeriodo(v)}>
                           <SelectTrigger className="h-7 border-none bg-transparent hover:bg-white/5 focus:ring-0 focus:ring-offset-0 px-2 shadow-none transition-colors rounded group gap-1.5 outline-none cursor-pointer">
                             <div className="flex items-center gap-1.5 text-[10px]">
                               <Calendar className="h-3 w-3 text-gray-400 group-hover:text-gray-300 transition-colors" />
@@ -1486,6 +1616,8 @@ export default function OrderFulfillmentDashboard() {
                             </div>
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="7D">Últimos 7 Dias</SelectItem>
+                            <SelectItem value="15D">Últimos 15 Dias</SelectItem>
                             <SelectItem value="30D">Últimos 30 Dias</SelectItem>
                             <SelectItem value="60D">Últimos 60 Dias</SelectItem>
                             <SelectItem value="90D">Últimos 90 Dias</SelectItem>
@@ -1737,15 +1869,86 @@ export default function OrderFulfillmentDashboard() {
           </TabsContent>
 
           <TabsContent value="rupturas" className="mt-0">
-            {!isConfigAuthenticated ? renderPasswordScreen() : (
-              <RupturasTab 
-                periodo={periodo} 
-                setPeriodo={setPeriodo} // <--- Adicione esta linha
-                rupturasRanking={rupturasRanking} 
-                formatNumber={formatNumber} 
-                formatName={formatName} 
-              />
-            )}
+            <RupturasTab 
+              periodo={periodo}
+              setPeriodo={setPeriodo}
+              rupturasRanking={rupturasRanking || []}
+              formatNumber={formatNumber}
+              formatName={formatName}
+            />
+          </TabsContent>
+
+          <TabsContent value="evolucao" className="mt-0">
+            <EvolucaoTab 
+              historicoEvolucao={historicoEvolucao || []} 
+              hcConfig={hcConfig} 
+              activeAverageStages={activeAverageStages}
+              formatNumber={formatNumber}
+              currentRealTimeData={globalStats && groupedData ? (() => {
+                
+                const mappedGlobalStages = globalStats.stages.map((stg: any, i: number) => {
+                  if (i === 1) { 
+                    const totalTrocas = (stg.trocasAuto || 0) + (stg.trocasManual || 0);
+                    return totalTrocas > 0 ? (stg.trocasAuto / totalTrocas) * 100 : 0; 
+                  }
+                  return stg.metaOrders > 0 ? Math.min((stg.activeOrders / stg.metaOrders) * 100, 100) : (stg.totalOrders > 0 ? 100 : 0);
+                });
+
+                const getStgPct = (stg: any, i: number) => {
+                  if (i === 1) { 
+                    const total = (stg.trocasAuto || 0) + (stg.trocasManual || 0);
+                    return total > 0 ? (stg.trocasAuto / total) * 100 : 0;
+                  }
+                  return stg.metaOrders > 0 ? Math.min((stg.activeOrders / stg.metaOrders) * 100, 100) : (stg.totalOrders > 0 ? 100 : 0);
+                };
+
+                return {
+                  mes: "2026-05", 
+                  // CORREÇÃO: Puxando a Média Ponderada Real de volta!
+                  globalPct: getOverallAutomationPct(globalStats.stages, activeAverageStages),
+                  globalStages: mappedGlobalStages,
+                  globalVolumes: globalStats.stages.map((stg: any) => ({
+                    pedidos: stg.totalOrders || 0,
+                    itens: (stg.trocasAuto || 0) + (stg.trocasManual || 0), 
+                    canais: stg.channels || []
+                  })),
+                  records: groupedData.map(exec => {
+                    // CORREÇÃO: Lendo a variável 'erps' que contém os clientes
+                    const executivoClientes = exec.erps || exec.clients || [];
+                    
+                    return {
+                      gestor: exec.name,
+                      mediaPonderada: getOverallAutomationPct(exec.stats.stages, activeAverageStages),
+                      etapa1: getStgPct(exec.stats.stages[0], 0),
+                      etapa2: getStgPct(exec.stats.stages[1], 1),
+                      etapa3: getStgPct(exec.stats.stages[2], 2),
+                      etapa4: getStgPct(exec.stats.stages[3], 3),
+                      etapa5: getStgPct(exec.stats.stages[4], 4),
+                      etapa6: getStgPct(exec.stats.stages[5], 5),
+                      volumes: exec.stats.stages.map((stg: any) => ({
+                        pedidos: stg.totalOrders || 0,
+                        itens: (stg.trocasAuto || 0) + (stg.trocasManual || 0),
+                        canais: stg.channels || []
+                      })),
+                      clients: executivoClientes.map((cli: any) => ({
+                        name: cli.name,
+                        etapa1: getStgPct(cli.stats.stages[0], 0),
+                        etapa2: getStgPct(cli.stats.stages[1], 1),
+                        etapa3: getStgPct(cli.stats.stages[2], 2),
+                        etapa4: getStgPct(cli.stats.stages[3], 3),
+                        etapa5: getStgPct(cli.stats.stages[4], 4),
+                        etapa6: getStgPct(cli.stats.stages[5], 5),
+                        volumes: cli.stats.stages.map((stg: any) => ({
+                          pedidos: stg.totalOrders || 0,
+                          itens: (stg.trocasAuto || 0) + (stg.trocasManual || 0),
+                          canais: stg.channels || []
+                        }))
+                      }))
+                    };
+                  })
+                };
+              })() : undefined}
+            />
           </TabsContent>
 
           <TabsContent value="historico" className="mt-0">
@@ -1984,6 +2187,175 @@ export default function OrderFulfillmentDashboard() {
                           </div>
                         </label>
                       ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* --- NOVO CARD DE PARÂMETROS DE HC --- */}
+                <Card className="shadow-lg border-primary/20 lg:col-span-2">
+                  <CardHeader className="bg-white border-b px-6 py-4 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl flex items-center gap-2 text-gray-800">
+                        <Users className="h-6 w-6 text-primary" /> Parâmetros de Headcount (HC) e ROI
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">Defina o tempo médio que a equipe leva para realizar cada tarefa. Isso calculará as horas e os HCs poupados pela automação.</p>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="flex flex-col gap-6">
+                      
+                      <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200 w-fit">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-gray-700 uppercase tracking-widest">Carga Horária Mensal por Pessoa</span>
+                          <span className="text-[10px] text-muted-foreground">Quantas horas úteis 1 funcionário trabalha por mês?</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="number" value={hcConfig.horasMes} onChange={e => updateHcTime('horasMes', null, e.target.value)} className="w-20 text-center border border-gray-300 rounded-md h-9 outline-none focus:ring-1 focus:ring-primary font-bold text-gray-800" />
+                          <span className="text-sm font-bold text-gray-500">Horas</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        {/* ETAPA 1 */}
+                        <div className="border rounded-lg p-4 bg-white shadow-sm">
+                          <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-4 border-b pb-2">
+                            <FileSpreadsheet className="h-4 w-4 text-primary" /> Tempos de Entrada (Por Pedido)
+                          </h4>
+                          <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2">
+                            {Object.keys(entrySystems).sort().map(sys => (
+                              <div key={sys} className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-gray-600 truncate mr-2" title={sys}>{sys}</span>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <input 
+                                    type="number" step="0.1" 
+                                    value={hcConfig.tempos.etapa1?.[sys] !== undefined ? hcConfig.tempos.etapa1[sys] : 0} 
+                                    onChange={e => updateHcTime('etapa1', sys, e.target.value)} 
+                                    className="w-16 text-center text-xs border border-gray-300 rounded-md h-7 outline-none focus:ring-1 focus:ring-primary" 
+                                  />
+                                  <span className="text-[9px] font-bold text-gray-400">min</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* ETAPAS 2 A 6 */}
+                        <div className="border rounded-lg p-4 bg-white shadow-sm">
+                          <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-4 border-b pb-2">
+                            <Clock className="h-4 w-4 text-primary" /> Outras Etapas (Intervenção Manual)
+                          </h4>
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold text-gray-700">E2: Tratamento de Rupturas</span>
+                                <span className="text-[9px] text-muted-foreground uppercase">Tempo gasto POR ITEM</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <input type="number" step="0.1" value={hcConfig.tempos.etapa2_rupturas} onChange={e => updateHcTime('etapa2_rupturas', null, e.target.value)} className="w-16 text-center text-xs border border-gray-300 rounded-md h-7 outline-none focus:ring-1 focus:ring-primary" />
+                                <span className="text-[9px] font-bold text-gray-400">min</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold text-gray-700">E3: Programação de Pedidos</span>
+                                <span className="text-[9px] text-muted-foreground uppercase">Tempo gasto POR PEDIDO</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <input type="number" step="0.1" value={hcConfig.tempos.etapa3_programacao} onChange={e => updateHcTime('etapa3_programacao', null, e.target.value)} className="w-16 text-center text-xs border border-gray-300 rounded-md h-7 outline-none focus:ring-1 focus:ring-primary" />
+                                <span className="text-[9px] font-bold text-gray-400">min</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold text-gray-700">E4: Geração de OV</span>
+                                <span className="text-[9px] text-muted-foreground uppercase">Tempo gasto POR PEDIDO</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <input type="number" step="0.1" value={hcConfig.tempos.etapa4_geracaoOV} onChange={e => updateHcTime('etapa4_geracaoOV', null, e.target.value)} className="w-16 text-center text-xs border border-gray-300 rounded-md h-7 outline-none focus:ring-1 focus:ring-primary" />
+                                <span className="text-[9px] font-bold text-gray-400">min</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold text-gray-700">E5: Liberação de Pedidos</span>
+                                <span className="text-[9px] text-muted-foreground uppercase">Tempo gasto POR PEDIDO</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <input type="number" step="0.1" value={hcConfig.tempos.etapa5_liberacao} onChange={e => updateHcTime('etapa5_liberacao', null, e.target.value)} className="w-16 text-center text-xs border border-gray-300 rounded-md h-7 outline-none focus:ring-1 focus:ring-primary" />
+                                <span className="text-[9px] font-bold text-gray-400">min</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold text-gray-700">E6: Ocorrências de Entrega</span>
+                                <span className="text-[9px] text-muted-foreground uppercase">Tempo gasto POR CHAMADO</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <input type="number" step="0.1" value={hcConfig.tempos.etapa6_ocorrencias} onChange={e => updateHcTime('etapa6_ocorrencias', null, e.target.value)} className="w-16 text-center text-xs border border-gray-300 rounded-md h-7 outline-none focus:ring-1 focus:ring-primary" />
+                                <span className="text-[9px] font-bold text-gray-400">min</span>
+                              </div>
+                            </div>
+
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                {/* --- FIM DO NOVO CARD --- */}
+
+{/* --- NOVO: CARD DE IMPORTAÇÃO DE HISTÓRICO --- */}
+                <Card className="shadow-lg border-primary/20 lg:col-span-2">
+                  <CardHeader className="bg-white border-b px-6 py-4 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl flex items-center gap-2 text-gray-800">
+                        <History className="h-6 w-6 text-primary" /> Importar Histórico de Automação (Passado)
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">Cole aqui os dados do Excel. Ordem: Gestor | Entrada | Programação | Liberação | SAP | Ruptura | Ocorrência.</p>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="flex flex-col gap-2 w-full md:w-1/4">
+                        <label className="text-xs font-bold text-gray-700">Mês de Referência</label>
+                        <select 
+                          value={histMonth} 
+                          onChange={e => setHistMonth(e.target.value)}
+                          className="border border-gray-300 rounded-md h-10 px-3 text-sm outline-none focus:ring-1 focus:ring-primary bg-white cursor-pointer"
+                        >
+                          <option value="2025-09">Setembro / 2025</option>
+                          <option value="2025-10">Outubro / 2025</option>
+                          <option value="2025-11">Novembro / 2025</option>
+                          <option value="2025-12">Dezembro / 2025</option>
+                          <option value="2026-01">Janeiro / 2026</option>
+                          <option value="2026-02">Fevereiro / 2026</option>
+                          <option value="2026-03">Março / 2026</option>
+                          <option value="2026-04">Abril / 2026</option>
+                        </select>
+                        <Button 
+                          onClick={handleImportHistory} 
+                          disabled={isImportingHist || !histData}
+                          className="mt-auto h-10 font-bold"
+                        >
+                          {isImportingHist ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <Upload className="h-4 w-4 mr-2"/>}
+                          Gravar Mês
+                        </Button>
+                      </div>
+                      
+                      <div className="flex-1">
+                        <textarea 
+                          value={histData}
+                          onChange={e => setHistData(e.target.value)}
+                          placeholder="Selecione as linhas no Excel e cole aqui..."
+                          className="w-full h-40 p-4 border border-gray-300 rounded-md text-xs font-mono whitespace-pre outline-none focus:ring-1 focus:ring-primary focus:border-primary shadow-inner bg-gray-50"
+                        />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

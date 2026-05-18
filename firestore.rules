@@ -10,6 +10,15 @@ service cloud.firestore {
     match /cubo_metrics/{metricId} {
       allow read, write: if true;
     }
+
+    // NOVAS COLEÇÕES LIBERADAS
+    match /automation_logs/{logId} {
+      allow read, write: if true;
+    }
+
+    match /historico_evolucao/{histId} {
+      allow read, write: if true;
+    }
     
     // Regra padrão: bloqueia tudo o que não foi explicitamente permitido
     match /{document=**} {

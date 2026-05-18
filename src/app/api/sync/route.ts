@@ -107,16 +107,17 @@ export async function POST(request: Request) {
         etapa2Ativo: item.Etapa2Ativo === true || item.etapa2Ativo === true,
         etapa3Ativo: item.Etapa3Ativo === true || item.etapa3Ativo === true,
         
-        // 👇 CORREÇÃO: Lê a string real ou fallback
         utilizaJanela: String(item.UtilizaJanelaCorte ?? item.utilizaJanela ?? "NAO").toUpperCase(),
         trocaAutomatica: String(item.TrocaAutomatica ?? item.trocaAutomatica ?? "").toUpperCase(),
         multiCdEnderecos: String(item.MultiCDEnderecos ?? item.multiCdEnderecos ?? "NAO").toUpperCase(),
-        fatMultiCD: String(item.FatMultiCD ?? item.fatMultiCD ?? "NAO").toUpperCase(), // Novo campo!
+        fatMultiCD: String(item.FatMultiCD ?? item.fatMultiCD ?? "NAO").toUpperCase(),
         naoLiberarPedidoSemOC: String(item.NaoLiberarPedidoSemOC ?? item.naoLiberarPedidoSemOC ?? "NAO").toUpperCase(),
         
         ordersCurrent: Number(item.Orders_Current) || 0,
         robCurrent: Number(item.ROB_Current) || 0,
         
+        Historico_7D: item.Historico_7D || {},     // ADICIONADO AQUI!
+        Historico_15D: item.Historico_15D || {},   // ADICIONADO AQUI!
         Historico_30D: item.Historico_30D || {},
         Historico_60D: item.Historico_60D || {},
         Historico_90D: item.Historico_90D || {},
