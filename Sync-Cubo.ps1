@@ -136,6 +136,65 @@ ResumoTrocas AS (
 
     FROM ItensTratados
     GROUP BY CdExtCliente
+),
+ChamadosBase AS (
+    -- COLOQUE AQUI O NOME REAL DA SUA TABELA DE CHAMADOS (EX: Cubo_Chamados)
+    SELECT 
+        c.CdExtCliente,
+        TRY_CAST(ch.DataAbertura AS DATETIME) as DataAbertura,
+        ch.Problema,
+        ch.NmCliente
+    FROM Chamados ch 
+    LEFT JOIN BR_Cliente_Cubo c ON ch.NmCliente = c.NmCliente
+    WHERE TRY_CAST(ch.DataAbertura AS DATETIME) >= DATEADD(day, -90, GETDATE())
+),
+WhitelistProblemas AS (
+    SELECT DISTINCT Problema
+    FROM ChamadosBase
+    WHERE CdExtCliente IS NOT NULL
+),
+ChamadosConhecidos AS (
+    SELECT 
+        CdExtCliente,
+        SUM(CASE WHEN DataAbertura >= DATEADD(day, -7, GETDATE()) THEN 1 ELSE 0 END) as chamados_7D,
+        SUM(CASE WHEN DataAbertura >= DATEADD(day, -15, GETDATE()) THEN 1 ELSE 0 END) as chamados_15D,
+        SUM(CASE WHEN DataAbertura >= DATEADD(day, -30, GETDATE()) THEN 1 ELSE 0 END) as chamados_30D,
+        SUM(CASE WHEN DataAbertura >= DATEADD(day, -60, GETDATE()) THEN 1 ELSE 0 END) as chamados_60D,
+        SUM(CASE WHEN DataAbertura >= DATEADD(day, -90, GETDATE()) THEN 1 ELSE 0 END) as chamados_90D
+    FROM ChamadosBase
+    WHERE CdExtCliente IS NOT NULL AND Problema IN (SELECT Problema FROM WhitelistProblemas)
+    GROUP BY CdExtCliente
+),
+TotalConhecidos AS (
+    SELECT 
+        NULLIF(SUM(chamados_7D), 0) as tot_7D,
+        NULLIF(SUM(chamados_15D), 0) as tot_15D,
+        NULLIF(SUM(chamados_30D), 0) as tot_30D,
+        NULLIF(SUM(chamados_60D), 0) as tot_60D,
+        NULLIF(SUM(chamados_90D), 0) as tot_90D
+    FROM ChamadosConhecidos
+),
+ChamadosOrfaos AS (
+    SELECT 
+        SUM(CASE WHEN DataAbertura >= DATEADD(day, -7, GETDATE()) THEN 1 ELSE 0 END) as orfaos_7D,
+        SUM(CASE WHEN DataAbertura >= DATEADD(day, -15, GETDATE()) THEN 1 ELSE 0 END) as orfaos_15D,
+        SUM(CASE WHEN DataAbertura >= DATEADD(day, -30, GETDATE()) THEN 1 ELSE 0 END) as orfaos_30D,
+        SUM(CASE WHEN DataAbertura >= DATEADD(day, -60, GETDATE()) THEN 1 ELSE 0 END) as orfaos_60D,
+        SUM(CASE WHEN DataAbertura >= DATEADD(day, -90, GETDATE()) THEN 1 ELSE 0 END) as orfaos_90D
+    FROM ChamadosBase
+    WHERE CdExtCliente IS NULL AND Problema IN (SELECT Problema FROM WhitelistProblemas)
+),
+ChamadosRateados AS (
+    SELECT 
+        c.CdExtCliente,
+        c.chamados_7D  + ROUND(ISNULL(c.chamados_7D * 1.0 / t.tot_7D * o.orfaos_7D, 0), 0) as Ocorrencias_7D,
+        c.chamados_15D + ROUND(ISNULL(c.chamados_15D * 1.0 / t.tot_15D * o.orfaos_15D, 0), 0) as Ocorrencias_15D,
+        c.chamados_30D + ROUND(ISNULL(c.chamados_30D * 1.0 / t.tot_30D * o.orfaos_30D, 0), 0) as Ocorrencias_30D,
+        c.chamados_60D + ROUND(ISNULL(c.chamados_60D * 1.0 / t.tot_60D * o.orfaos_60D, 0), 0) as Ocorrencias_60D,
+        c.chamados_90D + ROUND(ISNULL(c.chamados_90D * 1.0 / t.tot_90D * o.orfaos_90D, 0), 0) as Ocorrencias_90D
+    FROM ChamadosConhecidos c
+    CROSS JOIN TotalConhecidos t
+    CROSS JOIN ChamadosOrfaos o
 )
 SELECT DISTINCT
     C.CdExtCliente, C.Cart_Executivo_Vendas as Executivo, C.NmCliente as Cliente, C.NmConglomerado as Conglomerado,
@@ -164,11 +223,19 @@ SELECT DISTINCT
     ISNULL(T.pedManual_60D, 0) as pedManual_60D, ISNULL(T.pedAuto_60D, 0) as pedAuto_60D, ISNULL(T.ped100Auto_60D, 0) as ped100Auto_60D, ISNULL(T.itens100Auto_60D, 0) as itens100Auto_60D,
     
     ISNULL(T.trocasAuto_90D, 0) as trocasAuto_90D, ISNULL(T.trocasManual_90D, 0) as trocasManual_90D, ISNULL(T.rupturas_90D, 0) as rupturas_90D,
-    ISNULL(T.pedManual_90D, 0) as pedManual_90D, ISNULL(T.pedAuto_90D, 0) as pedAuto_90D, ISNULL(T.ped100Auto_90D, 0) as ped100Auto_90D, ISNULL(T.itens100Auto_90D, 0) as itens100Auto_90D
+    ISNULL(T.pedManual_90D, 0) as pedManual_90D, ISNULL(T.pedAuto_90D, 0) as pedAuto_90D, ISNULL(T.ped100Auto_90D, 0) as ped100Auto_90D, ISNULL(T.itens100Auto_90D, 0) as itens100Auto_90D,
+
+    ISNULL(CH.Ocorrencias_7D, 0) as Ocorrencias_7D,
+    ISNULL(CH.Ocorrencias_15D, 0) as Ocorrencias_15D,
+    ISNULL(CH.Ocorrencias_30D, 0) as Ocorrencias_30D,
+    ISNULL(CH.Ocorrencias_60D, 0) as Ocorrencias_60D,
+    ISNULL(CH.Ocorrencias_90D, 0) as Ocorrencias_90D
+
 FROM BR_Cliente_Cubo C
 LEFT JOIN (SELECT ClienteID, MIN(CAST(FlagNaoLiberaAutomatico AS INT)) as FlagNaoLiberaAutomatico, COUNT(*) as QtdJanelas FROM Cubo_Janela_Corte WHERE DataJanelaCorte >= DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0) GROUP BY ClienteID) J ON C.ClienteID = J.ClienteID
 LEFT JOIN PedidosStats P ON C.ClienteID = P.ClienteID
 LEFT JOIN ResumoTrocas T ON C.CdExtCliente = T.CdExtCliente
+LEFT JOIN ChamadosRateados CH ON C.CdExtCliente = CH.CdExtCliente
 WHERE C.CdExtCliente IN ($sqlInClause) AND (C.NmCarteira LIKE '%Contrat%' OR C.NmCarteira LIKE '%Implant%');
 "@
 
@@ -187,7 +254,7 @@ $QueryDetalhes = @"
 SET DATEFORMAT dmy;
 
 SELECT 
-    c.ClienteID, -- NOVA COLUNA ADICIONADA AQUI
+    c.ClienteID,
     c.CdExtCliente,
     c.Cart_Executivo_Vendas as Executivo,
     c.NmConglomerado as Conglomerado,
@@ -230,7 +297,7 @@ foreach ($Row in $ResultDetalhes) {
     $itemDetail = @{
         "executivo" = if ([DBNull]::Value.Equals($Row["Executivo"])) { "Não Informado" } else { $Row["Executivo"].ToString().Trim() }
         "cliente" = if ([DBNull]::Value.Equals($Row["Conglomerado"])) { "Sem Nome" } else { $Row["Conglomerado"].ToString().Trim() }
-        "clienteId" = if ([DBNull]::Value.Equals($Row["ClienteID"])) { "-" } else { $Row["ClienteID"].ToString().Trim() } # NOVO CAMPO CAPTURADO
+        "clienteId" = if ([DBNull]::Value.Equals($Row["ClienteID"])) { "-" } else { $Row["ClienteID"].ToString().Trim() }
         "erpCode" = $cd
         "pedido" = $Row["pedido"].ToString().Trim()
         "data" = $Row["data"].ToString().Trim()
@@ -243,10 +310,8 @@ foreach ($Row in $ResultDetalhes) {
         "dataTimestamp" = if ($dataPedidoObj -ne [System.DBNull]::Value) { $dataPedidoObj.ToString("yyyy-MM-ddTHH:mm:ss") } else { (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss") }
     }
 
-    # Salva TUDO no array gigante para o Excel analítico
     $AllDetailsExcel += $itemDetail
 
-    # Para a interface do painel web não ficar pesada, enviamos só os últimos 7 dias na tooltip (Max 150)
     if ($dataPedidoObj -ne [System.DBNull]::Value -and $dataPedidoObj -ge $Date7DaysAgo) {
         if (-not $ItensPorCliente.ContainsKey($cd)) { $ItensPorCliente[$cd] = @() }
         if ($ItensPorCliente[$cd].Count -lt 150) {
@@ -255,7 +320,6 @@ foreach ($Row in $ResultDetalhes) {
     }
 }
 
-# Cria a pasta public se não existir e salva o JSON analítico lá!
 $JsonPath = ".\public\rupturas_analitico.json"
 if (-not (Test-Path ".\public")) { New-Item -ItemType Directory -Path ".\public" | Out-Null }
 $AllDetailsExcel | ConvertTo-Json -Depth 5 -Compress | Out-File $JsonPath -Encoding UTF8
@@ -313,6 +377,7 @@ foreach ($Row in $Result) {
             "pedidosAuto" = if ($isAtivo) { [int]$Row["pedAuto_7D"] } else { 0 }
             "pedidos100Auto" = if ($isAtivo) { [int]$Row["ped100Auto_7D"] } else { 0 }
             "itens100Auto" = if ($isAtivo) { [int]$Row["itens100Auto_7D"] } else { 0 }
+            "qtdOcorrencias" = if ($isAtivo) { [int]$Row["Ocorrencias_7D"] } else { 0 }
         }
         "Historico_15D" = @{
             "Orders" = if ($isAtivo) { [int]$Row["Orders_15D"] } else { 0 }
@@ -324,6 +389,7 @@ foreach ($Row in $Result) {
             "pedidosAuto" = if ($isAtivo) { [int]$Row["pedAuto_15D"] } else { 0 }
             "pedidos100Auto" = if ($isAtivo) { [int]$Row["ped100Auto_15D"] } else { 0 }
             "itens100Auto" = if ($isAtivo) { [int]$Row["itens100Auto_15D"] } else { 0 }
+            "qtdOcorrencias" = if ($isAtivo) { [int]$Row["Ocorrencias_15D"] } else { 0 }
         }
         "Historico_30D" = @{
             "Orders" = if ($isAtivo) { [int]$Row["Orders_30D"] } else { 0 }
@@ -335,6 +401,7 @@ foreach ($Row in $Result) {
             "pedidosAuto" = if ($isAtivo) { [int]$Row["pedAuto_30D"] } else { 0 }
             "pedidos100Auto" = if ($isAtivo) { [int]$Row["ped100Auto_30D"] } else { 0 }
             "itens100Auto" = if ($isAtivo) { [int]$Row["itens100Auto_30D"] } else { 0 }
+            "qtdOcorrencias" = if ($isAtivo) { [int]$Row["Ocorrencias_30D"] } else { 0 }
         }
         "Historico_60D" = @{
             "Orders" = if ($isAtivo) { [int]$Row["Orders_60D"] } else { 0 }
@@ -346,6 +413,7 @@ foreach ($Row in $Result) {
             "pedidosAuto" = if ($isAtivo) { [int]$Row["pedAuto_60D"] } else { 0 }
             "pedidos100Auto" = if ($isAtivo) { [int]$Row["ped100Auto_60D"] } else { 0 }
             "itens100Auto" = if ($isAtivo) { [int]$Row["itens100Auto_60D"] } else { 0 }
+            "qtdOcorrencias" = if ($isAtivo) { [int]$Row["Ocorrencias_60D"] } else { 0 }
         }
         "Historico_90D" = @{
             "Orders" = if ($isAtivo) { [int]$Row["Orders_90D"] } else { 0 }
@@ -357,6 +425,7 @@ foreach ($Row in $Result) {
             "pedidosAuto" = if ($isAtivo) { [int]$Row["pedAuto_90D"] } else { 0 }
             "pedidos100Auto" = if ($isAtivo) { [int]$Row["ped100Auto_90D"] } else { 0 }
             "itens100Auto" = if ($isAtivo) { [int]$Row["itens100Auto_90D"] } else { 0 }
+            "qtdOcorrencias" = if ($isAtivo) { [int]$Row["Ocorrencias_90D"] } else { 0 }
         }
 
         "IntegracaoAutomaticaSAP" = $integraSAP
@@ -380,6 +449,21 @@ foreach ($Row in $Result) {
 }
 
 Write-Host "Processamento concluído. $( $ResultData.Count ) clientes preparados." -ForegroundColor Green
+
+# --- 5.5 GUARDA ANTI-ZERO ---
+# Se a Cubo_Pedido for lida durante um refresh/ETL, ela fica vazia por instantes e
+# TODOS os Orders/ROB vêm 0 (enquanto trocas/chamados de outras tabelas seguem com valor).
+# Publicar isso zera o dashboard (a tela filtra Orders>0). Então, se o total de pedidos
+# do lote for 0, ABORTAMOS o envio para preservar os dados bons já publicados no Firestore.
+$TotalOrders90D = 0
+foreach ($item in $ResultData) {
+    if ($item.Historico_90D -and $item.Historico_90D.Orders) { $TotalOrders90D += [int]$item.Historico_90D.Orders }
+}
+Write-Host "Guarda anti-zero: total de pedidos (90D) no lote = $TotalOrders90D" -ForegroundColor Cyan
+if ($ResultData.Count -gt 0 -and $TotalOrders90D -le 0) {
+    Write-Host "ABORTADO: total de pedidos (90D) = 0 para os $($ResultData.Count) clientes. Provavel leitura da Cubo_Pedido durante refresh/ETL. Envio ao Firestore CANCELADO para nao sobrescrever dados bons." -ForegroundColor Red
+    exit 1
+}
 
 # --- 6. ENVIO PARA A API DE SYNC ---
 if ($ResultData.Count -gt 0) {

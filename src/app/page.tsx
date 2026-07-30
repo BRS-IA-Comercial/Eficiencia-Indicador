@@ -492,8 +492,8 @@ export default function OrderFulfillmentDashboard() {
   const logsQuery = useMemo(() => query(collection(db, "automation_logs"), orderBy("data", "desc"), limit(400)), [db]);
   const historicoQuery = useMemo(() => query(collection(db, "historico_evolucao")), [db]);
 
-  const { data: erpMappings, loading: isLoadingMappings } = useCollection(erpMappingsQuery);
-  const { data: cuboMetrics, loading: isLoadingMetrics } = useCollection(cuboMetricsQuery);
+  const { data: erpMappings, loading: isLoadingMappings, error: errorMappings } = useCollection(erpMappingsQuery);
+  const { data: cuboMetrics, loading: isLoadingMetrics, error: errorMetrics } = useCollection(cuboMetricsQuery);
   const { data: automationLogs, loading: isLoadingLogs } = useCollection(logsQuery);
   const { data: historicoEvolucao, loading: isLoadingEvolucao } = useCollection(historicoQuery);
 
@@ -1640,6 +1640,27 @@ export default function OrderFulfillmentDashboard() {
               <div className="max-h-[750px] overflow-y-auto bg-white dark:bg-surface-dark relative">
                 {(isLoadingMappings || isLoadingMetrics) && (
                   <div className="p-12 text-center text-muted-foreground animate-pulse"><Loader2 className="animate-spin inline mr-2 h-5 w-5" /> Sincronizando dados em tempo real...</div>
+                )}
+
+                {/* PAINEL DE DIAGNOSTICO: erro do Firestore explicito (nunca mais falha silenciosa) */}
+                {(errorMetrics || errorMappings) && (
+                  <div className="m-4 p-4 rounded-md bg-red-50 border border-red-300 text-red-800 text-sm">
+                    <div className="flex items-center gap-2 font-bold mb-1"><AlertTriangle className="h-4 w-4" /> Erro ao carregar dados do Firestore</div>
+                    {errorMetrics && <div>• cubo_metrics: <b>[{errorMetrics.code}]</b> {errorMetrics.message}</div>}
+                    {errorMappings && <div>• erp_mappings: <b>[{errorMappings.code}]</b> {errorMappings.message}</div>}
+                    <div className="mt-2 text-xs text-red-600">Se aparecer "permission-denied", o problema e regra do Firestore; se "unavailable"/timeout, e rede/transporte.</div>
+                  </div>
+                )}
+
+                {/* PAINEL DE DIAGNOSTICO: carregou sem erro mas veio vazio (evita tela branca muda) */}
+                {!isLoadingMappings && !isLoadingMetrics && !errorMetrics && !errorMappings && (globalStats == null || groupedData.length === 0) && !hasActiveFilter && (
+                  <div className="m-4 p-4 rounded-md bg-amber-50 border border-amber-300 text-amber-800 text-xs font-mono">
+                    <div className="font-bold mb-1">Diagnostico de dados (conectado, sem linhas para exibir)</div>
+                    <div>cubo_metrics recebidos: <b>{cuboMetrics ? cuboMetrics.length : 'null'}</b></div>
+                    <div>erp_mappings recebidos: <b>{erpMappings ? erpMappings.length : 'null'}</b></div>
+                    <div>conglomerados apos motor/filtros (groupedData): <b>{groupedData ? groupedData.length : 'null'}</b></div>
+                    <div>globalStats: <b>{globalStats ? 'ok' : 'null'}</b> | mostrarZerados(showEmptyClients): <b>{String(showEmptyClients)}</b></div>
+                  </div>
                 )}
 
                 {globalStats && groupedData.length > 0 && (

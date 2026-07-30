@@ -1,13 +1,23 @@
 'use client';
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { firebaseConfig } from './config';
 
 export function initializeFirebase() {
-  const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-  const firestore = getFirestore(firebaseApp);
+  const isNewApp = getApps().length === 0;
+  const firebaseApp = isNewApp ? initializeApp(firebaseConfig) : getApp();
+  // Em redes corporativas o proxy/firewall costuma bloquear o WebChannel de streaming
+  // do Firestore (onSnapshot fica pendurado). initializeFirestore com auto-detect de
+  // long-polling faz o SDK cair para long-polling quando detecta a interferencia.
+  // So pode ser chamado uma unica vez por app; nas remontagens reutiliza a instancia.
+  const firestore = isNewApp
+    ? initializeFirestore(firebaseApp, {
+        experimentalAutoDetectLongPolling: true,
+        useFetchStreams: false,
+      })
+    : getFirestore(firebaseApp);
   const auth = getAuth(firebaseApp);
 
   return { firebaseApp, firestore, auth };
